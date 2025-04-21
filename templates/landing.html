@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Analyseur de CV - Page d'accueil{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row mb-5">
+        <div class="col-lg-8 mx-auto text-center">
+            <h1 class="display-4 mb-4">Analyseur de CV vs Description de Poste</h1>
+            <p class="lead mb-5">Optimisez vos chances d'entretien avec notre analyseur alimenté par l'IA</p>
+        </div>
+    </div>
+
+    <div class="row mb-5">
+        <div class="col-lg-10 mx-auto">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-5">
+                    <h2 class="text-center mb-4">Comment ça fonctionne</h2>
+                    
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-4 text-center">
+                            <div class="bg-light p-3 rounded-3 mb-3">
+                                <i class="bi bi-upload fs-1"></i>
+                            </div>
+                            <h5>1. Soumettez votre CV</h5>
+                            <p>Collez le texte de votre CV et de la description du poste souhaité</p>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <div class="bg-light p-3 rounded-3 mb-3">
+                                <i class="bi bi-robot fs-1"></i>
+                            </div>
+                            <h5>2. Analyse IA</h5>
+                            <p>Notre système analyse la correspondance et identifie les améliorations potentielles</p>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <div class="bg-light p-3 rounded-3 mb-3">
+                                <i class="bi bi-file-earmark-text fs-1"></i>
+                            </div>
+                            <h5>3. Recevez des recommandations</h5>
+                            <p>Obtenez une analyse détaillée et un CV optimisé pour l'ATS sur demande</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-5">
+        <div class="col-lg-10 mx-auto">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-5">
+                    <h2 class="text-center mb-4">Caractéristiques principales</h2>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <div class="d-flex">
+                                <div class="flex-shrink-0">
+                                    <i class="bi bi-check-circle-fill text-success fs-4 me-2"></i>
+                                </div>
+                                <div>
+                                    <h5>Interface multilingue</h5>
+                                    <p>Analysez vos documents en français ou en anglais</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="d-flex">
+                                <div class="flex-shrink-0">
+                                    <i class="bi bi-check-circle-fill text-success fs-4 me-2"></i>
+                                </div>
+                                <div>
+                                    <h5>Analyse axée ATS</h5>
+                                    <p>Optimisez votre CV pour les systèmes de suivi des candidatures</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="d-flex">
+                                <div class="flex-shrink-0">
+                                    <i class="bi bi-check-circle-fill text-success fs-4 me-2"></i>
+                                </div>
+                                <div>
+                                    <h5>Réécriture de CV optionnelle</h5>
+                                    <p>Notre IA peut reformuler votre CV pour maximiser l'impact</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="d-flex">
+                                <div class="flex-shrink-0">
+                                    <i class="bi bi-check-circle-fill text-success fs-4 me-2"></i>
+                                </div>
+                                <div>
+                                    <h5>Rapports téléchargeables</h5>
+                                    <p>Enregistrez vos analyses au format Markdown</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feedback Modal -->
+<div class="modal fade" id="feedbackModal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="feedbackModalLabel">Envoyez-nous vos commentaires</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('submit_feedback') }}" method="POST">
+                <div class="modal-body">
+                    {{ form.csrf_token }}
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Votre e-mail</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="comments" class="form-label">Commentaires</label>
+                        <textarea class="form-control" id="comments" name="comments" rows="4" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Envoyer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+    <!-- Add Feedback Button -->
+    <div class="row">
+        <div class="col-lg-8 mx-auto text-center">
+            <div class="d-grid gap-3 d-sm-flex justify-content-sm-center">
+                <a href="{{ url_for('form') }}" class="btn btn-primary btn-lg px-4 py-3">
+                    <i class="bi bi-play-circle me-2"></i>Tester le système
+                </a>
+                <button type="button" class="btn btn-outline-secondary btn-lg px-4 py-3" data-bs-toggle="modal" data-bs-target="#feedbackModal">
+                    <i class="bi bi-chat-dots me-2"></i>Laisser un commentaire
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+{% endblock %}

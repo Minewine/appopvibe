@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}CV Analysis Results{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>CV Analysis Results</h1>
+            <a href="{{ url_for('download_report', filename=report_filename) }}" class="btn btn-outline-primary">
+                <i class="bi bi-download"></i> Download Report
+            </a>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-body markdown-content">
+                {{ analysis_html|safe }}
+            </div>
+        </div>
+        
+        {% if rewritten_cv_html %}
+        <h2 class="mt-5 mb-4">Rewritten CV (ATS Optimized)</h2>
+        <div class="card">
+            <div class="card-body markdown-content">
+                {{ rewritten_cv_html|safe }}
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="mt-4">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Start New Analysis</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Allow users to copy code blocks with a click
+    document.querySelectorAll('pre').forEach(block => {
+        block.addEventListener('click', () => {
+            const text = block.textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                // Show a temporary "Copied!" tooltip
+                const tooltip = document.createElement('div');
+                tooltip.textContent = 'Copied!';
+                tooltip.style.position = 'absolute';
+                tooltip.style.left = `${block.offsetLeft + block.offsetWidth/2 - 30}px`;
+                tooltip.style.top = `${block.offsetTop - 30}px`;
+                tooltip.style.padding = '5px 10px';
+                tooltip.style.background = '#333';
+                tooltip.style.color = '#fff';
+                tooltip.style.borderRadius = '3px';
+                tooltip.style.opacity = '0.9';
+                tooltip.style.transition = 'opacity 1s';
+                document.body.appendChild(tooltip);
+                setTimeout(() => {
+                    tooltip.style.opacity = '0';
+                    setTimeout(() => document.body.removeChild(tooltip), 1000);
+                }, 1000);
+            });
+        });
+    });
+</script>
+{% endblock %}

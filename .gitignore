@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*build*/
+*develop-eggs*/
+*dist*/
+*downloads*/
+*eggs*/
+*.eggs/
+*lib*/
+*lib64*/
+*parts*/
+*sdist*/
+*var*/
+*wheels*/
+*share/python-wheels*/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Environment
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Config - Consider if config.py contains secrets
+# config.py
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Reports - Optional, depends if you want to track them
+# reports/
