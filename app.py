@@ -23,6 +23,7 @@ from dotenv import load_dotenv
 from langdetect import detect, LangDetectException
 from slugify import slugify
 from datetime import timezone
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # 1. Configuration and Constants
 load_dotenv() # Load environment variables
@@ -110,6 +111,8 @@ ALLOWED_HTML_ATTRIBUTES = {
 
 # Initialize Flask application
 app = Flask(__name__)
+# Add this line to handle reverse proxies
+app.wsgi_app = ProxyFix(app.wsgi_app, x_prefix=1)
 
 # Apply Configuration
 app.config['SECRET_KEY'] = SECRET_KEY
@@ -121,9 +124,12 @@ app.config['PERMANENT_SESSION_LIFETIME'] = 3600 # Session lifetime in seconds
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH_BYTES
 app.config['REPORTS_FOLDER'] = REPORTS_FOLDER
 app.config['FEEDBACK_FOLDER'] = FEEDBACK_FOLDER
-# Session type config (optional, defaults to client-side if not specified)
-# app.config['SESSION_TYPE'] = 'filesystem'
-# app.config['SESSION_FILE_DIR'] = SESSION_FOLDER
+app.config['APPLICATION_ROOT'] = os.getenv('APPLICATION_ROOT', '/appopvibe')
+app.config['SESSION_COOKIE_PATH'] = os.getenv('APPLICATION_ROOT', '/appopvibe')
+
+# Session type config - enable filesystem sessions for better reliability
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_FILE_DIR'] = SESSION_FOLDER
 
 # Security Configurations - CSRF disabled due to session issues
 # csrf = CSRFProtect(app) # Commented out to disable CSRF
@@ -661,10 +667,10 @@ def internal_server_error(error):
 
 
 # Optional: Add a simple root path if APPLICATION_ROOT is used by a proxy
-# if os.getenv('APPLICATION_ROOT'):
-#     @app.route(os.getenv('APPLICATION_ROOT') + '/')
-#     def root_redirect():
-#         return redirect(url_for('index'))
+if os.getenv('APPLICATION_ROOT', '/appopvibe'):
+    @app.route(os.getenv('APPLICATION_ROOT', '/appopvibe') + '/')
+    def root_redirect():
+        return redirect(url_for('index'))
 
 # Entry point for running the app
 if __name__ == '__main__':
