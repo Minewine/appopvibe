@@ -236,10 +236,16 @@ def load_mock_data_if_enabled():
 
 
 def call_llm_api(prompt, temperature=0.7):
-    """Calls the OpenRouter API with a given prompt."""
+    """Calls the OpenRouter API with a given prompt. Falls back to mock data on authentication failure."""
     if not OPENROUTER_API_KEY or OPENROUTER_API_KEY == 'REPLACE_WITH_YOUR_OPENROUTER_KEY_OR_REMOVE':
-        logging.error("OpenRouter API key not configured.")
-        return "Error: API key not configured."
+        logging.error("OpenRouter API key not configured. Falling back to mock data.")
+        # Fall back to mock data if API key is missing
+        if hasattr(g, 'mock_data'):
+            return g.mock_data.get('analysis', "Error: Mock data not available")
+        else:
+            # Load mock data if not already loaded
+            mock_data = load_mock_report_sections(MOCK_REPORT_PATH)
+            return mock_data.get('analysis', "Error: Failed to load mock data")
 
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
@@ -260,7 +266,6 @@ def call_llm_api(prompt, temperature=0.7):
     truncated_prompt = prompt[:max_prompt_length]
     if len(prompt) > max_prompt_length:
         logging.warning(f"Prompt truncated from {len(prompt)} to {max_prompt_length} characters.")
-
 
     payload = {
         "model": model,
@@ -289,6 +294,17 @@ def call_llm_api(prompt, temperature=0.7):
     except httpx.HTTPStatusError as e:
         error_msg = f"HTTP status error from LLM API: {e.response.status_code} - {e.response.text}"
         logging.error(error_msg, exc_info=True)
+        
+        # Fall back to mock data for authentication errors (401)
+        if e.response.status_code == 401:
+            logging.warning("Authentication failed. Falling back to mock data.")
+            if hasattr(g, 'mock_data'):
+                return g.mock_data.get('analysis', "Error: Mock data not available")
+            else:
+                # Load mock data if not already loaded
+                mock_data = load_mock_report_sections(MOCK_REPORT_PATH)
+                return mock_data.get('analysis', "Error: Failed to load mock data")
+        
         # Attempt to return API error message if available
         try:
             error_json = e.response.json()
@@ -514,12 +530,17 @@ def form():
 
     return render_template('form.html', form=form)
 
-@app.route('/feedback', methods=['POST'])
+@app.route('/feedback', methods=['GET', 'POST'])
 @limiter.limit("10 per day") # Apply rate limit to feedback submissions
 def submit_feedback():
     """Process feedback submission and save to a markdown file."""
     form = FeedbackForm()
-
+    
+    # If it's a GET request, just render the feedback form
+    if request.method == 'GET':
+        return render_template('feedback.html', form=form)
+    
+    # For POST requests, process the form
     if form.validate_on_submit():
         email = form.email.data
         comments = form.comments.data
