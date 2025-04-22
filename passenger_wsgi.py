@@ -11,5 +11,6 @@ from app import app as application
 
 # Optional: Set environment variables here if not using cPanel UI
 # os.environ['FLASK_ENV'] = 'production'
+os.environ['SCRIPT_NAME'] = '/appopvibe'
 
 # The variable 'application' is what Passenger looks for by default.

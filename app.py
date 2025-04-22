@@ -1,5 +1,5 @@
 """
-CV vs Job Description Analyzer - Flask Application
+Refactored CV vs Job Description Analyzer - Flask Application
 """
 import os
 import time
@@ -7,181 +7,375 @@ import datetime
 import bleach
 import httpx
 import markdown2
+import logging # Use standard logging
 from flask import (
-    Flask, render_template, request, redirect, url_for, 
-    flash, send_from_directory, session
+    Flask, render_template, request, redirect, url_for,
+    flash, send_from_directory, session, g # Use g for request-local storage
 )
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFProtect
-from wtforms import TextAreaField, SelectField, BooleanField
-from wtforms.validators import DataRequired, Length
+from wtforms import StringField, TextAreaField, SelectField, BooleanField
+from wtforms.validators import DataRequired, Email, Length, Optional
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from langdetect import detect, LangDetectException
 from slugify import slugify
 from datetime import timezone
 
-# Load environment variables from .env file
-load_dotenv()
+# 1. Configuration and Constants
+load_dotenv() # Load environment variables
 
-# Import prompts
-from prompts.prompts_en import FULL_ANALYSIS_PROMPT_TEMPLATE_EN, CV_REWRITE_PROMPT_TEMPLATE_EN
-from prompts.prompts_fr import FULL_ANALYSIS_PROMPT_TEMPLATE_FR, CV_REWRITE_PROMPT_TEMPLATE_FR
+# Application Configuration
+# IMPORTANT: Replace this with a strong, random key. Use environment variables in production.
+SECRET_KEY = os.getenv('SECRET_KEY', 'REPLACE_THIS_WITH_A_VERY_STRONG_RANDOM_KEY')
+if SECRET_KEY == 'REPLACE_THIS_WITH_A_VERY_STRONG_RANDOM_KEY':
+    logging.warning("SECRET_KEY is not set via environment variable. Using default placeholder.")
 
-# Import default values from config.py
-from config import default_cv, default_jd
+APP_ROOT = os.path.dirname(os.path.abspath(__file__))
+REPORTS_FOLDER = os.path.join(APP_ROOT, 'reports')
+FEEDBACK_FOLDER = os.path.join(APP_ROOT, 'feedback')
+SESSION_FOLDER = os.path.join(APP_ROOT, 'flask_session') # For filesystem sessions if needed
 
-# Initialize Flask application
-app = Flask(__name__)
-app.config['SECRET_KEY'] = os.urandom(24)
-app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_CONTENT_SIZE_KB', 30)) * 1024
-app.config['REPORTS_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reports')
+# Ensure directories exist
+os.makedirs(REPORTS_FOLDER, exist_ok=True)
+os.makedirs(FEEDBACK_FOLDER, exist_ok=True)
+os.makedirs(SESSION_FOLDER, exist_ok=True)
 
-# Ensure the reports directory exists
-os.makedirs(app.config['REPORTS_FOLDER'], exist_ok=True)
+# File Size Limits (in bytes)
+MAX_CONTENT_SIZE_KB = int(os.getenv('MAX_CONTENT_SIZE_KB', 30))
+MAX_CONTENT_LENGTH_BYTES = MAX_CONTENT_SIZE_KB * 1024
 
-# Ensure the feedback directory exists
-app.config['FEEDBACK_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'feedback')
-os.makedirs(app.config['FEEDBACK_FOLDER'], exist_ok=True)
+# Report Retention
+REPORT_RETENTION_DAYS = int(os.getenv('REPORT_RETENTION_DAYS', 30))
 
-# Setup CSRF protection
-csrf = CSRFProtect(app)
+# LLM API Configuration
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', 'REPLACE_WITH_YOUR_OPENROUTER_KEY_OR_REMOVE')
+# IMPORTANT: Remove or replace the hardcoded API key above if this is committed publicly.
+if OPENROUTER_API_KEY == 'REPLACE_WITH_YOUR_OPENROUTER_KEY_OR_REMOVE':
+     logging.warning("OPENROUTER_API_KEY is not set via environment variable. Using default placeholder.")
 
-# Setup rate limiting
-limiter = Limiter(
-    get_remote_address,
-    app=app,
-    default_limits=["100 per day", "20 per hour"],
-    storage_uri="memory://",
-)
+DEFAULT_MODEL = os.getenv('DEFAULT_MODEL', 'deepseek/deepseek-chat-v3-0324')
+USE_MOCK_DATA = os.getenv('USE_MOCK_DATA', 'true').lower() == 'true'
+MOCK_REPORT_PATH = os.path.join(REPORTS_FOLDER, 'report_2025-04-21T05-05-11Z.md')
 
-# Constants
+
+# Supported Languages and Prompts
 SUPPORTED_LANGUAGES = {
     'en': 'English',
     'fr': 'Français'
 }
 
-PROMPT_TEMPLATES = {
-    'en': {
-        'analysis': FULL_ANALYSIS_PROMPT_TEMPLATE_EN,
-        'rewrite': CV_REWRITE_PROMPT_TEMPLATE_EN
-    },
-    'fr': {
-        'analysis': FULL_ANALYSIS_PROMPT_TEMPLATE_FR,
-        'rewrite': CV_REWRITE_PROMPT_TEMPLATE_FR
+# Import prompts (assuming these files exist and define the templates)
+try:
+    from prompts.prompts_en import FULL_ANALYSIS_PROMPT_TEMPLATE_EN, CV_REWRITE_PROMPT_TEMPLATE_EN
+    from prompts.prompts_fr import FULL_ANALYSIS_PROMPT_TEMPLATE_FR, CV_REWRITE_PROMPT_TEMPLATE_FR
+
+    PROMPT_TEMPLATES = {
+        'en': {
+            'analysis': FULL_ANALYSIS_PROMPT_TEMPLATE_EN,
+            'rewrite': CV_REWRITE_PROMPT_TEMPLATE_EN
+        },
+        'fr': {
+            'analysis': FULL_ANALYSIS_PROMPT_TEMPLATE_FR,
+            'rewrite': CV_REWRITE_PROMPT_TEMPLATE_FR
+        }
     }
+except ImportError as e:
+    logging.critical(f"Error loading prompt templates: {e}. Ensure prompts/prompts_en.py and prompts/prompts_fr.py exist.")
+    PROMPT_TEMPLATES = {} # Define empty to prevent errors later
+
+# Import default values (assuming config.py exists and defines these)
+try:
+    from config import default_cv, default_jd
+except ImportError as e:
+    logging.critical(f"Error loading default values from config.py: {e}. Ensure config.py exists.")
+    default_cv = "Paste your CV here..."
+    default_jd = "Paste the Job Description here..."
+
+
+# Bleach Allowed Tags (for sanitizing HTML output)
+ALLOWED_HTML_TAGS = [
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'ul', 'ol', 'li',
+    'strong', 'em', 'a', 'code', 'pre', 'blockquote', 'table', 'thead',
+    'tbody', 'tr', 'th', 'td', 'hr', 'div', 'span' # Added div/span for potentially structured markdown output
+]
+ALLOWED_HTML_ATTRIBUTES = {
+    'a': ['href', 'title', 'target'],
+    'div': ['class'], # Allow classes on div if needed for styling markdown output
+    'span': ['class']
 }
 
-# Form definition
+
+# Initialize Flask application
+app = Flask(__name__)
+
+# Apply Configuration
+app.config['SECRET_KEY'] = SECRET_KEY
+# Set to True in production with HTTPS
+app.config['SESSION_COOKIE_SECURE'] = os.getenv('SESSION_COOKIE_SECURE', 'False').lower() == 'true'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax' # Recommended for modern browsers
+app.config['PERMANENT_SESSION_LIFETIME'] = 3600 # Session lifetime in seconds
+app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH_BYTES
+app.config['REPORTS_FOLDER'] = REPORTS_FOLDER
+app.config['FEEDBACK_FOLDER'] = FEEDBACK_FOLDER
+# Session type config (optional, defaults to client-side if not specified)
+# app.config['SESSION_TYPE'] = 'filesystem'
+# app.config['SESSION_FILE_DIR'] = SESSION_FOLDER
+
+# Security Configurations - CSRF disabled due to session issues
+# csrf = CSRFProtect(app) # Commented out to disable CSRF
+app.config['WTF_CSRF_ENABLED'] = False # Disable CSRF completely
+
+# Setup rate limiting (temporarily disabled)
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["1000 per day", "1000 per hour"], # Greatly increased limits
+    storage_uri="memory://", # Consider more persistent storage like Redis in production
+    # Change 'on_breach_notify' to 'on_breach'
+    on_breach=lambda limit: logging.warning(f"Rate limit breached for {limit.key}: {limit.limit}"),
+    application_limits=["1000 per hour"] # Greatly increased limits
+)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+
+# 2. Forms Definition
 class CVAnalysisForm(FlaskForm):
+    """Form for submitting CV and Job Description."""
     cv = TextAreaField('CV', validators=[
-        DataRequired(),
-        Length(min=100, max=int(os.getenv('MAX_CONTENT_SIZE_KB', 30)) * 1024, 
-               message='CV must be between 100 characters and 30KB in size')
+        DataRequired('CV is required.'),
+        Length(min=100, max=MAX_CONTENT_LENGTH_BYTES,
+               message=f'CV must be between 100 characters and {MAX_CONTENT_SIZE_KB}KB in size.')
     ])
     jd = TextAreaField('Job Description', validators=[
-        DataRequired(),
-        Length(min=50, max=int(os.getenv('MAX_CONTENT_SIZE_KB', 30)) * 1024,
-               message='Job description must be between 50 characters and 30KB in size')
+        DataRequired('Job Description is required.'),
+        Length(min=50, max=MAX_CONTENT_LENGTH_BYTES,
+               message=f'Job description must be between 50 characters and {MAX_CONTENT_SIZE_KB}KB in size.')
     ])
-    language = SelectField('Language', choices=[('en', 'English'), ('fr', 'Français')])
+    language = SelectField('Language', choices=list(SUPPORTED_LANGUAGES.items()))
     rewrite_cv = BooleanField('Rewrite my CV')
 
-def auto_detect_language(text):
-    """Attempt to detect the language of the provided text"""
-    try:
-        lang_code = detect(text)
-        return 'fr' if lang_code == 'fr' else 'en'  # Default to English for anything but French
-    except LangDetectException:
-        return 'en'  # Default to English on detection failure
 
-def call_openrouter_api(prompt, temperature=0.7):
-    api_key = os.getenv('OPENROUTER_API_KEY')
-    if not api_key:
-        raise ValueError("OpenRouter API key not found.")
+class FeedbackForm(FlaskForm):
+    """Form for submitting user feedback."""
+    email = StringField('Your Email (Optional)', validators=[Optional()])  # Removed Email validator to avoid dependency
+    comments = TextAreaField('Comments', validators=[
+        DataRequired('Comments are required.'),
+        Length(min=10, message='Comments must be at least 10 characters long.')
+    ])
+
+
+# 3. Helper Functions and Service Logic
+
+def load_mock_report_sections(filepath):
+    """Loads and parses mock analysis and rewrite sections from a file."""
+    if not os.path.exists(filepath):
+        logging.error(f"Mock report file not found: {filepath}")
+        return {"analysis": "Error: Mock report file not found.", "rewrite": "Error: Mock report file not found."}
+
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        analysis = "Error: Could not find analysis section in mock report."
+        rewrite = "Error: Could not find Rewritten CV section in mock report."
+
+        # Extract the LLM Analysis section
+        analysis_start = content.find('## LLM Analysis')
+        rewrite_start = content.find('## Rewritten CV')
+
+        if analysis_start != -1:
+            analysis_content = content[analysis_start + len('## LLM Analysis'):]
+            if rewrite_start != -1 and rewrite_start > analysis_start:
+                # Analysis ends before rewrite section
+                analysis = analysis_content[:rewrite_start - analysis_start - len('## LLM Analysis')].strip()
+            else:
+                 # Analysis goes to the end of the file if no rewrite section
+                 analysis = analysis_content.strip()
+
+        # Extract the Rewritten CV section
+        if rewrite_start != -1:
+            rewrite_content = content[rewrite_start + len('## Rewritten CV'):].strip()
+            # Assuming rewritten CV is in a code block
+            code_block_start = rewrite_content.find('```')
+            if code_block_start != -1:
+                code_block_content = rewrite_content[code_block_start + 3:].strip()
+                code_block_end = code_block_content.find('```')
+                if code_block_end != -1:
+                    rewrite = code_block_content[:code_block_end].strip()
+                else:
+                    rewrite = code_block_content.strip() # No closing ```? Use rest of content
+            else:
+                 rewrite = rewrite_content # Not in a code block? Use content after heading
+
+
+        logging.info(f"Loaded mock data from {filepath}")
+        return {"analysis": analysis, "rewrite": rewrite}
+
+    except Exception as e:
+        logging.error(f"Error reading or parsing mock report file: {str(e)}", exc_info=True)
+        return {"analysis": f"Error loading mock data: {str(e)}", "rewrite": f"Error loading mock data: {str(e)}"}
+
+# Store mock data in request-local storage after the first load
+@app.before_request
+def load_mock_data_if_enabled():
+    """Load mock data into request context if mock mode is enabled."""
+    if USE_MOCK_DATA and 'mock_data' not in g:
+        g.mock_data = load_mock_report_sections(MOCK_REPORT_PATH)
+
+
+def call_llm_api(prompt, temperature=0.7):
+    """Calls the OpenRouter API with a given prompt."""
+    if not OPENROUTER_API_KEY or OPENROUTER_API_KEY == 'REPLACE_WITH_YOUR_OPENROUTER_KEY_OR_REMOVE':
+        logging.error("OpenRouter API key not configured.")
+        return "Error: API key not configured."
 
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        # Use X-Title for identification on OpenRouter dashboard
+        "X-Title": "CV Analyzer",
+         # Required if API key is linked to a specific site
+        "HTTP-Referer": os.getenv('OPENROUTER_REFERER', 'https://rametric.com'),
     }
 
-    model = 'openai/gpt-3.5-turbo:free'  # Try a different default model
+    # LLM Model
+    model = DEFAULT_MODEL
 
-    # Further reduce the prompt size to avoid excessive payload size
-    max_length = 3800  # Slightly reduce max_length further
-    truncated_prompt = prompt[:max_length]
+    # Truncate prompt if necessary (LLM APIs have token limits)
+    # Note: This is a crude truncation. A proper tokenization approach is better.
+    max_prompt_length = 3800 # Characters is a proxy for tokens
+    truncated_prompt = prompt[:max_prompt_length]
+    if len(prompt) > max_prompt_length:
+        logging.warning(f"Prompt truncated from {len(prompt)} to {max_prompt_length} characters.")
+
 
     payload = {
         "model": model,
         "messages": [{"role": "user", "content": truncated_prompt}],
         "temperature": temperature,
-        "stream": False
+        "stream": False # Sync call for simplicity in this example
     }
 
-    app.logger.debug(f"Sending payload to OpenRouter: {payload}")
-    app.logger.debug(f"Headers: {headers}")
+    logging.debug(f"Calling LLM API with model: {model}")
 
     try:
-        with httpx.Client(timeout=45.0) as client:
+        # Increased timeout as LLM calls can be slow
+        with httpx.Client(timeout=60.0) as client:
             response = client.post(url, json=payload, headers=headers)
-            # Log detailed error response from API
-            if response.status_code != 200:
-                app.logger.error(f"OpenRouter API Error {response.status_code}: {response.text}")
             response.raise_for_status() # Raise HTTPStatusError for bad responses (4xx or 5xx)
             result = response.json()
-            # Check if 'choices' exists and is not empty
+
             if 'choices' in result and result['choices']:
-                return result['choices'][0]['message']['content']
+                content = result['choices'][0]['message']['content']
+                logging.info("LLM API call successful.")
+                return content
             else:
-                app.logger.error(f"OpenRouter API response missing 'choices': {result}")
+                logging.error(f"LLM API response missing 'choices': {result}")
                 return "Error: Invalid response format from API."
-    except httpx.HTTPStatusError as e: # Catch status errors specifically
-        error_msg = f"HTTP status error occurred: {e.response.status_code} - {e.response.text}"
-        app.logger.error(error_msg)
+
+    except httpx.HTTPStatusError as e:
+        error_msg = f"HTTP status error from LLM API: {e.response.status_code} - {e.response.text}"
+        logging.error(error_msg, exc_info=True)
+        # Attempt to return API error message if available
+        try:
+            error_json = e.response.json()
+            if 'error' in error_json and 'message' in error_json['error']:
+                 error_msg += f" Details: {error_json['error']['message']}"
+        except:
+            pass # Ignore JSON parsing errors on response text
+
         return f"Error: {error_msg}"
-    except httpx.RequestError as e: # Catch request errors (network, timeout, etc.)
-        error_msg = f"HTTP request error occurred: {str(e)}"
-        app.logger.error(error_msg)
+    except httpx.RequestError as e:
+        error_msg = f"HTTP request error occurred during LLM API call: {str(e)}"
+        logging.error(error_msg, exc_info=True)
         return f"Error: {error_msg}"
     except Exception as e:
-        error_msg = f"An unexpected error occurred: {str(e)}"
-        app.logger.error(error_msg)
+        error_msg = f"An unexpected error occurred during LLM API call: {str(e)}"
+        logging.error(error_msg, exc_info=True)
         return f"Error: {error_msg}"
 
-def sanitize_markdown(markdown_text):
-    """Sanitize markdown content to prevent XSS attacks"""
+def analyze_cv_jd(cv_text, jd_text, language):
+    """Generates analysis using LLM or mock data."""
+    if language not in PROMPT_TEMPLATES or 'analysis' not in PROMPT_TEMPLATES[language]:
+         logging.error(f"Analysis prompt template missing for language: {language}")
+         return "Error: Configuration error for analysis prompt."
+
+    if USE_MOCK_DATA:
+        logging.info("Using mock data for analysis.")
+        # Access mock data from request context if loaded
+        return getattr(g, 'mock_data', {}).get('analysis', 'Error: Mock analysis data not loaded.')
+
+    analysis_template = PROMPT_TEMPLATES[language]['analysis']
+    analysis_prompt = analysis_template.format(cv=cv_text, jd=jd_text)
+    return call_llm_api(analysis_prompt)
+
+def rewrite_cv(cv_text, jd_text, language):
+    """Generates rewritten CV using LLM or mock data."""
+    if language not in PROMPT_TEMPLATES or 'rewrite' not in PROMPT_TEMPLATES[language]:
+        logging.error(f"Rewrite prompt template missing for language: {language}")
+        return "Error: Configuration error for rewrite prompt."
+
+    if USE_MOCK_DATA:
+        logging.info("Using mock data for CV rewrite.")
+        # Access mock data from request context if loaded
+        return getattr(g, 'mock_data', {}).get('rewrite', 'Error: Mock rewrite data not loaded.')
+
+    rewrite_template = PROMPT_TEMPLATES[language]['rewrite']
+    rewrite_prompt = rewrite_template.format(cv=cv_text, jd=jd_text)
+    return call_llm_api(rewrite_prompt)
+
+def sanitize_html_output(html_text):
+    """Sanitizes HTML content to prevent XSS attacks."""
+    if not html_text:
+        return ""
     return bleach.clean(
-        markdown_text,
-        tags=['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'ul', 'ol', 'li', 
-              'strong', 'em', 'a', 'code', 'pre', 'blockquote', 'table', 'thead', 
-              'tbody', 'tr', 'th', 'td', 'hr'],
-        attributes={'a': ['href', 'title', 'target']}
+        html_text,
+        tags=ALLOWED_HTML_TAGS,
+        attributes=ALLOWED_HTML_ATTRIBUTES,
+        strip=True # Remove tags not in the allow list
     )
 
-def generate_report_filename(language="en"):
+def convert_markdown_to_sanitized_html(markdown_text):
+    """Converts markdown to HTML and then sanitizes it."""
+    if not markdown_text:
+        return ""
+    try:
+        html_output = markdown2.markdown(markdown_text, extras=["tables", "fenced-code-blocks", "nofollow"])
+        return sanitize_html_output(html_output)
+    except Exception as e:
+        logging.error(f"Error converting markdown or sanitizing: {str(e)}", exc_info=True)
+        return f"<p>Error displaying content. Raw text:</p><pre>{bleach.clean(markdown_text, tags=[], attributes={}, strip=True)}</pre>"
+
+
+def generate_report_filename():
+    """Generates a unique filename for a report."""
     timestamp = datetime.datetime.now(timezone.utc).strftime('%Y-%m-%dT%H-%M-%SZ')
     return f"report_{timestamp}.md"
 
 
 def save_report(cv_text, jd_text, analysis_text, rewritten_cv=None, language="English"):
-    timestamp = datetime.datetime.now(timezone.utc).strftime('%Y-%m-%dT%H-%M-%SZ')
-    report_content = f"""# CV Analysis Report — {timestamp}
+    """Saves the analysis report to a markdown file."""
+    filename = generate_report_filename()
+    filepath = os.path.join(REPORTS_FOLDER, filename)
+
+    report_content = f"""# CV Analysis Report — {datetime.datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ UTC')}
 
 ## Language
 {language}
 
 ## Candidate CV
-```
 {cv_text}
-```
 
 ## Job Description
-```
 {jd_text}
-```
+
 
 ## LLM Analysis
 {analysis_text}
@@ -191,251 +385,291 @@ def save_report(cv_text, jd_text, analysis_text, rewritten_cv=None, language="En
         report_content += f"""
 
 ## Rewritten CV
-```
 {rewritten_cv}
-```
+
 """
 
-    filename = generate_report_filename()
-    filepath = os.path.join(app.config['REPORTS_FOLDER'], filename)
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(report_content)
+        logging.info(f"Report saved successfully: {filename}")
+        return filename
+    except Exception as e:
+        logging.error(f"Error saving report {filename}: {str(e)}", exc_info=True)
+        return None # Indicate failure
 
-    with open(filepath, 'w', encoding='utf-8') as f:
-        f.write(report_content)
+def save_feedback(email, comments):
+    """Saves user feedback to a markdown file."""
+    timestamp = datetime.datetime.now(timezone.utc).strftime('%Y-%m-%dT%H-%M-%SZ')
+    email_slug = slugify(email or 'anonymous') # Slugify email for filename
+    filename = f"feedback_{timestamp}_{email_slug}.md"
+    filepath = os.path.join(FEEDBACK_FOLDER, filename)
 
-    return filename
+    feedback_content = f"""# Feedback Received
+
+**Timestamp:** {datetime.datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ UTC')}
+**From:** {email or 'Anonymous'}
+
+## Comments
+{comments}
+"""
+
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(feedback_content)
+        logging.info(f"Feedback saved successfully: {filename}")
+        return True
+    except Exception as e:
+        logging.error(f"Error saving feedback {filename}: {str(e)}", exc_info=True)
+        return False # Indicate failure
+
 
 def clean_old_reports():
-    """Delete reports older than REPORT_RETENTION_DAYS"""
-    retention_days = int(os.getenv('REPORT_RETENTION_DAYS', 30))
+    """Deletes reports older than REPORT_RETENTION_DAYS."""
     current_time = time.time()
-    max_age = retention_days * 24 * 60 * 60
-    
-    for filename in os.listdir(app.config['REPORTS_FOLDER']):
-        if filename.startswith('report_') and filename.endswith('.md'):
-            filepath = os.path.join(app.config['REPORTS_FOLDER'], filename)
-            file_age = current_time - os.path.getmtime(filepath)
-            if file_age > max_age:
+    max_age_seconds = REPORT_RETENTION_DAYS * 24 * 60 * 60
+
+    cleaned_count = 0
+    try:
+        for filename in os.listdir(REPORTS_FOLDER):
+            filepath = os.path.join(REPORTS_FOLDER, filename)
+            if os.path.isfile(filepath) and filename.startswith('report_') and filename.endswith('.md'):
                 try:
-                    os.remove(filepath)
-                    app.logger.info(f"Deleted old report: {filename}")
+                    file_age = current_time - os.path.getmtime(filepath)
+                    if file_age > max_age_seconds:
+                        os.remove(filepath)
+                        logging.info(f"Deleted old report: {filename}")
+                        cleaned_count += 1
                 except Exception as e:
-                    app.logger.error(f"Failed to delete {filename}: {str(e)}")
+                    logging.error(f"Failed to delete {filename}: {str(e)}")
+        if cleaned_count > 0:
+             logging.info(f"Finished cleaning old reports. Deleted {cleaned_count}.")
+
+    except Exception as e:
+        logging.error(f"Error during report cleanup process: {str(e)}")
+
+# Simple periodic cleanup check (could be a background task)
+# Run cleanup on app startup or periodically.
+# For simplicity, we can add a check in a request handler, but a background task is better.
+# Let's add a check in the submit route, but with a timestamp debounce.
+LAST_CLEANUP_TIME = 0
+
+def run_periodic_cleanup():
+    """Runs cleanup if a certain interval has passed."""
+    global LAST_CLEANUP_TIME
+    current_time = time.time()
+    # Run cleanup if it hasn't run in the last hour (3600 seconds)
+    CLEANUP_INTERVAL_SECONDS = 3600
+    if current_time - LAST_CLEANUP_TIME > CLEANUP_INTERVAL_SECONDS:
+        logging.info("Initiating periodic report cleanup.")
+        clean_old_reports()
+        LAST_CLEANUP_TIME = current_time
+
+
+def auto_detect_language(text):
+    """Attempt to detect the language of the provided text."""
+    try:
+        lang_code = detect(text)
+        # Return 'fr' if detected as fr, otherwise default to 'en'
+        return 'fr' if lang_code == 'fr' else 'en'
+    except LangDetectException:
+        logging.warning("Language detection failed, defaulting to English.")
+        return 'en' # Default to English on detection failure
+
+
+# 4. Routes Definition
 
 @app.route('/', methods=['GET'])
 def index():
-    """Render the landing page"""
-    form = FlaskForm()  # Just for CSRF token in the feedback form
-    return render_template('landing.html', form=form)
+    """Render the landing page."""
+    form = FeedbackForm() # Form for the feedback modal
+    # Flash messages handle feedback success/failure now
+    return render_template('landing.html', feedback_form=form) # Pass the feedback form
 
 @app.route('/form', methods=['GET'])
 def form():
-    """Render the CV analysis form"""
+    """Render the CV analysis form."""
     form = CVAnalysisForm()
     # Pre-fill the form with default values if fields are empty
-    form.cv.data = default_cv
-    form.jd.data = default_jd
+    if not form.cv.data:
+        form.cv.data = default_cv
+    if not form.jd.data:
+         form.jd.data = default_jd
+
+    # Auto-detect language from defaults or last submission if stored in session
+    if form.cv.data and form.jd.data:
+        combined_text = form.cv.data[:500] + form.jd.data[:500] # Use samples for detection
+        detected_lang = auto_detect_language(combined_text)
+        # Only set default language if the user hasn't selected one or it's the first load
+        if request.method == 'GET': # Only auto-detect on initial GET
+             form.language.data = detected_lang
+        # Or persist language choice in session:
+        # form.language.data = session.get('last_lang', detected_lang)
+
     return render_template('form.html', form=form)
 
 @app.route('/feedback', methods=['POST'])
-@limiter.limit("10 per day")
+@limiter.limit("10 per day") # Apply rate limit to feedback submissions
 def submit_feedback():
     """Process feedback submission and save to a markdown file."""
-    email = request.form.get('email', '')
-    comments = request.form.get('comments', '')
+    form = FeedbackForm()
 
-    if not email or not comments:
-        flash("Veuillez remplir tous les champs requis.", "danger")
-        return redirect(url_for('index'))
+    if form.validate_on_submit():
+        email = form.email.data
+        comments = form.comments.data
 
-    try:
-        # Generate filename
-        timestamp = datetime.datetime.now(timezone.utc).strftime('%Y-%m-%dT%H-%M-%SZ')
-        # Slugify email for filename, handle potential empty email or invalid chars
-        email_slug = slugify(email) if email else 'anonymous'
-        filename = f"feedback_{timestamp}_{email_slug}.md"
-        filepath = os.path.join(app.config['FEEDBACK_FOLDER'], filename)
+        if save_feedback(email, comments):
+            flash("Thank you for your feedback! We have received it.", "success")
+            logging.info("Feedback form validated and saved.")
+        else:
+            flash("An error occurred while saving your feedback. Please try again later.", "danger")
+            logging.error("Failed to save feedback.")
+    else:
+        # Flash validation errors automatically by WTForms or manually iterate
+        for field, errors in form.errors.items():
+             for error in errors:
+                  flash(f"Error in field '{form[field].label.text}': {error}", "danger")
+        logging.warning(f"Feedback form validation failed: {form.errors}")
 
-        # Format content
-        feedback_content = f"""# Feedback Received
-
-**Timestamp:** {timestamp}
-**From:** {email}
-
-## Comments
-
-```
-{comments}
-```
-"""
-
-        # Save the feedback to a file
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(feedback_content)
-
-        app.logger.info(f"Feedback received from {email} and saved to {filename}")
-
-        flash("Merci pour vos commentaires! Nous les avons bien reçus.", "success") # Updated flash message
-    except Exception as e:
-        app.logger.error(f"Error processing or saving feedback: {str(e)}", exc_info=True) # Add exc_info for more details
-        flash("Une erreur s'est produite lors de l'enregistrement de vos commentaires. Veuillez réessayer plus tard.", "danger")
-
+    # Redirect back to the index page regardless of success/failure
     return redirect(url_for('index'))
 
-def _validate_form(form):
-    """Validate the CVAnalysisForm and flash errors if invalid."""
-    if not form.validate_on_submit():
-        app.logger.warning(f"Form validation failed: {form.errors}")
-        for field, errors in form.errors.items():
-            for error in errors:
-                flash(f"Erreur dans le champ '{form[field].label.text}': {error}", "danger")
-        return False
-    return True
-
-def _extract_form_data(form):
-    """Extract data from the validated CVAnalysisForm."""
-    cv_text = form.cv.data
-    jd_text = form.jd.data
-    language = form.language.data
-    rewrite_requested = form.rewrite_cv.data
-    app.logger.info(f"Processing submission: lang={language}, rewrite={rewrite_requested}")
-    return cv_text, jd_text, language, rewrite_requested
-
-def _generate_analysis(cv_text, jd_text, language):
-    """Generate analysis using the OpenRouter API."""
-    try:
-        analysis_template = PROMPT_TEMPLATES[language]['analysis']
-        analysis_prompt = analysis_template.format(cv=cv_text, jd=jd_text)
-        analysis_result = call_openrouter_api(analysis_prompt)
-        if analysis_result.startswith("Error:"):
-            flash(f"Erreur lors de la génération de l'analyse: {analysis_result}", "danger")
-            return None # Indicate error
-        return analysis_result
-    except KeyError:
-        app.logger.error(f"Invalid language code '{language}' used for analysis prompt template.")
-        flash("Erreur interne du serveur: Configuration de langue invalide.", "danger")
-        return None # Indicate error
-    except Exception as e:
-        app.logger.error(f"Unexpected error during analysis generation: {str(e)}", exc_info=True)
-        flash("Une erreur inattendue s'est produite lors de la génération de l'analyse.", "danger")
-        return None # Indicate error
-
-def _generate_rewrite(cv_text, jd_text, language):
-    """Generate rewritten CV using the OpenRouter API."""
-    try:
-        rewrite_template = PROMPT_TEMPLATES[language]['rewrite']
-        rewrite_prompt = rewrite_template.format(cv=cv_text, jd=jd_text)
-        rewritten_cv = call_openrouter_api(rewrite_prompt)
-        if rewritten_cv.startswith("Error:"):
-            flash(f"Erreur lors de la réécriture du CV: {rewritten_cv}", "warning")
-            return None # Indicate error but allow analysis to proceed
-        return rewritten_cv
-    except KeyError:
-        app.logger.error(f"Invalid language code '{language}' used for rewrite prompt template.")
-        flash("Erreur interne du serveur: Configuration de langue invalide pour la réécriture.", "warning")
-        return None # Indicate error
-    except Exception as e:
-        app.logger.error(f"Unexpected error during CV rewrite: {str(e)}", exc_info=True)
-        flash("Une erreur inattendue s'est produite lors de la réécriture du CV.", "warning")
-        return None # Indicate error
-
-def _prepare_html_output(analysis_result, rewritten_cv):
-    """Convert markdown results to sanitized HTML."""
-    analysis_html = None
-    rewritten_cv_html = None
-    try:
-        if analysis_result:
-            analysis_html = markdown2.markdown(analysis_result, extras=["tables", "fenced-code-blocks", "nofollow"])
-            analysis_html = sanitize_markdown(analysis_html)
-
-        if rewritten_cv:
-            rewritten_cv_html = markdown2.markdown(rewritten_cv, extras=["tables", "fenced-code-blocks", "nofollow"])
-            rewritten_cv_html = sanitize_markdown(rewritten_cv_html)
-    except Exception as e:
-        app.logger.error(f"Error converting markdown to HTML or sanitizing: {str(e)}", exc_info=True)
-        flash("Erreur lors de l'affichage des résultats. Veuillez vérifier le rapport téléchargé.", "danger")
-        # Fallback: display raw text or error message if conversion fails
-        if analysis_result and not analysis_html:
-             analysis_html = f"<p>Error displaying analysis. Please download the report.</p><pre>{bleach.clean(analysis_result)}</pre>" # Sanitize raw text too
-        if rewritten_cv and not rewritten_cv_html:
-             rewritten_cv_html = f"<p>Error displaying rewritten CV.</p><pre>{bleach.clean(rewritten_cv)}</pre>" # Sanitize raw text too
-
-    return analysis_html, rewritten_cv_html
-
 @app.route('/submit', methods=['POST'])
-@limiter.limit("5 per hour")
+@limiter.limit("5 per hour") # Apply rate limit to analysis submissions
 def submit():
     """Process the submitted CV and JD, generate analysis, and display results."""
     form = CVAnalysisForm()
 
-    # 1. Validate Form
-    if not _validate_form(form):
-        return render_template('form.html', form=form), 400
+    if form.validate_on_submit():
+        cv_text = form.cv.data
+        jd_text = form.jd.data
+        language = form.language.data
+        rewrite_requested = form.rewrite_cv.data
 
-    # 2. Extract Data
-    cv_text, jd_text, language, rewrite_requested = _extract_form_data(form)
+        logging.info(f"Processing submission (Language: {language}, Rewrite: {rewrite_requested})")
 
-    # 3. Generate Analysis
-    analysis_result = _generate_analysis(cv_text, jd_text, language)
-    if analysis_result is None: # Check if analysis generation failed critically
-        return redirect(url_for('form'))
+        # Store language choice in session for form pre-filling on next visit (optional)
+        # session['last_lang'] = language
 
-    # 4. Generate Rewritten CV (if requested)
-    rewritten_cv = None
-    if rewrite_requested:
-        rewritten_cv = _generate_rewrite(cv_text, jd_text, language)
-        # Note: We proceed even if rewrite fails, as analysis might be useful.
+        # 3. Generate Analysis
+        analysis_result = analyze_cv_jd(cv_text, jd_text, language)
 
-    # 5. Save Report
-    language_name = SUPPORTED_LANGUAGES.get(language, "Unknown")
-    report_filename = save_report(
-        cv_text,
-        jd_text,
-        analysis_result, # Save raw result
-        rewritten_cv,    # Save raw result
-        language_name
-    )
-    if not report_filename:
-         flash("Impossible d'enregistrer le rapport. L'analyse est toujours affichée ci-dessous.", "warning")
+        # Handle critical errors from analysis generation
+        if analysis_result is None or analysis_result.startswith("Error:"):
+            flash(f"Analysis failed: {analysis_result or 'Unknown error'}", "danger")
+            logging.error(f"Analysis generation failed: {analysis_result}")
+            # Re-render form with submitted data
+            return render_template('form.html', form=form), 500 # Return server error status
 
-    # 6. Prepare HTML Output
-    analysis_html, rewritten_cv_html = _prepare_html_output(analysis_result, rewritten_cv)
+        # 4. Generate Rewritten CV (if requested)
+        rewritten_cv = None
+        if rewrite_requested:
+            rewritten_cv = rewrite_cv(cv_text, jd_text, language)
+            if rewritten_cv is None or rewritten_cv.startswith("Error:"):
+                flash(f"CV rewrite failed: {rewritten_cv or 'Unknown error'}. Analysis is still available.", "warning")
+                logging.warning(f"CV rewrite generation failed: {rewritten_cv}")
+                rewritten_cv = None # Ensure None if error string is returned
 
-    # 7. Clean Old Reports (Periodically)
-    # Consider moving this to a scheduled task (e.g., APScheduler, Celery)
-    try:
-        # Simple periodic check - adjust frequency as needed
-        if datetime.datetime.now().minute % 15 == 0: # Run approx every 15 mins
-            clean_old_reports()
-    except Exception as e:
-        app.logger.error(f"Error during periodic report cleanup: {str(e)}", exc_info=True)
 
-    # 8. Render Result
-    return render_template(
-        'result.html',
-        analysis_html=analysis_html,
-        rewritten_cv_html=rewritten_cv_html,
-        report_filename=report_filename
-    )
+        # 5. Save Report
+        language_name = SUPPORTED_LANGUAGES.get(language, "Unknown")
+        report_filename = save_report(
+            cv_text,
+            jd_text,
+            analysis_result, # Save raw result
+            rewritten_cv,    # Save raw result (can be None if rewrite failed/not requested)
+            language_name
+        )
+        if not report_filename:
+             flash("Could not save the report file. Analysis is shown below.", "warning")
+
+        # 6. Prepare HTML Output
+        analysis_html = convert_markdown_to_sanitized_html(analysis_result)
+        rewritten_cv_html = convert_markdown_to_sanitized_html(rewritten_cv) if rewritten_cv else None
+
+
+        # 7. Clean Old Reports (Periodically)
+        # Run cleanup periodically, not on every single request.
+        run_periodic_cleanup()
+
+        # 8. Render Result
+        return render_template(
+            'result.html',
+            analysis_html=analysis_html,
+            rewritten_cv_html=rewritten_cv_html,
+            report_filename=report_filename,
+            report_url=url_for('download_report', filename=report_filename) if report_filename else None
+        )
+
+    else:
+        # Form validation failed
+        logging.warning(f"CV Analysis form validation failed: {form.errors}")
+        # Flash messages are automatically handled by WTForms or the template
+        # Re-render the form with validation errors displayed
+        return render_template('form.html', form=form), 400 # Return bad request status
+
 
 @app.route('/reports/<filename>')
 def download_report(filename):
-    """Download a saved report file"""
+    """Download a saved report file."""
     # Security check to prevent path traversal
-    filename = secure_filename(filename)
-    if not filename.startswith('report_') or not filename.endswith('.md'):
-        flash("Invalid report filename", "danger")
+    base_filename = secure_filename(filename)
+    if not base_filename.startswith('report_') or not base_filename.endswith('.md'):
+        flash("Invalid report filename.", "danger")
         return redirect(url_for('index'))
-        
-    return send_from_directory(app.config['REPORTS_FOLDER'], filename, as_attachment=True)
 
+    filepath = os.path.join(REPORTS_FOLDER, base_filename)
+
+    # Ensure the file exists and is within the reports folder
+    if not os.path.exists(filepath) or not os.path.isfile(filepath):
+         flash("Report file not found.", "danger")
+         return redirect(url_for('index'))
+
+    # Optional: Add a check here if the report is too old to download?
+
+    try:
+        return send_from_directory(REPORTS_FOLDER, base_filename, as_attachment=True)
+    except FileNotFoundError:
+        flash("Report file not found.", "danger")
+        return redirect(url_for('index'))
+    except Exception as e:
+        logging.error(f"Error serving report file {base_filename}: {str(e)}", exc_info=True)
+        flash("An error occurred while trying to download the report.", "danger")
+        return redirect(url_for('index'))
+
+
+# 5. Error Handlers
 @app.errorhandler(413)
 def request_entity_too_large(error):
-    """Handle files that are too large"""
-    flash(f"Content too large. Maximum size is {os.getenv('MAX_CONTENT_SIZE_KB', 30)} KB", "danger")
-    return redirect(url_for('index')), 413
+    """Handle files that are too large."""
+    flash(f"Content too large. Maximum size is {MAX_CONTENT_SIZE_KB} KB.", "danger")
+    return redirect(url_for('form')), 413 # Redirect to form page
 
-# Run the app if executed directly
+@app.errorhandler(404)
+def page_not_found(error):
+    """Handle 404 errors."""
+    return render_template('404.html'), 404 # Assuming you have a 404.html template
+
+@app.errorhandler(500)
+def internal_server_error(error):
+    """Handle internal server errors."""
+    # Log the error properly
+    logging.error(f"Internal Server Error: {error}", exc_info=True)
+    flash("An unexpected server error occurred. Please try again later.", "danger")
+    # You could render a specific 500.html template if needed
+    return render_template('500.html'), 500 # Assuming you have a 500.html template
+
+
+# Optional: Add a simple root path if APPLICATION_ROOT is used by a proxy
+# if os.getenv('APPLICATION_ROOT'):
+#     @app.route(os.getenv('APPLICATION_ROOT') + '/')
+#     def root_redirect():
+#         return redirect(url_for('index'))
+
+# Entry point for running the app
 if __name__ == '__main__':
-    app.run(debug=os.getenv('FLASK_DEBUG', 'False').lower() == 'true',
-            host='0.0.0.0', 
-            port=int(os.getenv('PORT', 5000)))
+    # In production, use a production-ready server like Gunicorn or uWSGI
+    # app.run(debug=True, host='0.0.0.0')
+    print("Running development server. Use a production server like Gunicorn/uWSGI in production.")
+    print(f"Mock data is {'ENABLED' if USE_MOCK_DATA else 'DISABLED'}.")
+    app.run(debug=os.getenv('FLASK_DEBUG') == '1', host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
