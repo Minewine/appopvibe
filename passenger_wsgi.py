@@ -9,7 +9,7 @@ if project_home not in sys.path:
 # Set important environment variables before importing the app
 os.environ['SCRIPT_NAME'] = '/appopvibe'
 os.environ['APPLICATION_ROOT'] = '/appopvibe'
-os.environ['USE_MOCK_DATA'] = 'false'  # Use real API in production
+os.environ['USE_MOCK_DATA'] = 'true'  # Force using mock data to avoid API issues
 os.environ['SESSION_COOKIE_SECURE'] = 'true'  # Secure cookies with HTTPS
 
 # Import the Flask app after setting environment variables
