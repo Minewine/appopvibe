@@ -453,24 +453,29 @@ def index():
 @app.route('/form', methods=['GET'])
 def form():
     """Render the CV analysis form."""
-    form = CVAnalysisForm()
-    # Pre-fill the form with default values if fields are empty
-    if not form.cv.data:
-        form.cv.data = default_cv
-    if not form.jd.data:
-         form.jd.data = default_jd
+    try:
+        form = CVAnalysisForm()
+        logging.debug("Created form instance")
+        
+        # Pre-fill the form with default values if fields are empty
+        if not form.cv.data:
+            form.cv.data = default_cv
+            logging.debug("Set default CV text")
+            
+        if not form.jd.data:
+            form.jd.data = default_jd
+            logging.debug("Set default JD text")
 
-    # Auto-detect language from defaults or last submission if stored in session
-    if form.cv.data and form.jd.data:
-        combined_text = form.cv.data[:500] + form.jd.data[:500] # Use samples for detection
-        detected_lang = auto_detect_language(combined_text)
-        # Only set default language if the user hasn't selected one or it's the first load
-        if request.method == 'GET': # Only auto-detect on initial GET
-             form.language.data = detected_lang
-        # Or persist language choice in session:
-        # form.language.data = session.get('last_lang', detected_lang)
-
-    return render_template('form.html', form=form)
+        # Simplify language detection to avoid potential errors
+        form.language.data = 'en'  # Default to English 
+        logging.debug("Form prepared successfully")
+        
+        return render_template('form.html', form=form)
+        
+    except Exception as e:
+        logging.error(f"Error rendering form: {str(e)}", exc_info=True)
+        flash("An error occurred while loading the form. Please try again.", "danger")
+        return redirect(url_for('index'))
 
 @app.route('/feedback', methods=['GET', 'POST'])
 @app.route('/feedback/', methods=['GET', 'POST'])  # Added trailing slash variant to fix 404s
