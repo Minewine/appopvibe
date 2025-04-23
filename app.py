@@ -471,23 +471,23 @@ def form():
         logging.error(f"Error rendering form: {str(e)}", exc_info=True)
         return f"An error occurred while loading the form: {str(e)}", 500
 
-@app.route('/feedback/', methods=['GET', 'POST']) # Add route with trailing slash
-@app.route('/feedback', methods=['GET', 'POST'])
+@app.route('/feedback/', methods=['POST']) # Only allow POST requests
+@app.route('/feedback', methods=['POST'])  # Only allow POST requests
 # Rate limiting disabled for debugging
 def submit_feedback():
-    """Process feedback submission and save to a markdown file."""
-    logging.info(f"Entered submit_feedback() route for path: {request.path}") # Added log
+    """Process feedback submission (from modal) and save to a markdown file."""
+    logging.info(f"Entered submit_feedback() route for path: {request.path} (POST)") # Added log
     form = FeedbackForm()
-    
-    # If it's a GET request, just render the feedback form
-    if request.method == 'GET':
-        return render_template('feedback.html', form=form)
-    
+
+    # Removed GET request handling block entirely
+    # if request.method == 'GET':
+    #     return render_template('feedback.html', form=form)
+
     # For POST requests, process the form
     if form.validate_on_submit():
         email = form.email.data
         comments = form.comments.data
-        
+
         logging.debug(f"Processing feedback submission from {email}")
 
         success = save_feedback(email, comments)
@@ -504,13 +504,17 @@ def submit_feedback():
             logging.error("Failed to save feedback")
             return redirect(url_for('index'))
     else:
-        # Flash validation errors automatically by WTForms or manually iterate
+        # Flash validation errors and redirect back to the index page
         for field, errors in form.errors.items():
              for error in errors:
-                  flash(f"Error in field '{form[field].label.text}': {error}", "danger")
-                  session.modified = True
+                  # Use a more specific field name if possible
+                  field_label = getattr(getattr(form, field, None), 'label', None)
+                  field_name = field_label.text if field_label else field.replace('_', ' ').title()
+                  flash(f"Feedback Error ({field_name}): {error}", "danger")
+                  session.modified = True # Ensure flash messages are saved
         logging.warning(f"Feedback form validation failed: {form.errors}")
-        return render_template('feedback.html', form=form)
+        # Redirect back to index, the flashed messages will be displayed there
+        return redirect(url_for('index'))
 
 @app.route('/submit', methods=['POST'])
 # Rate limiting disabled for debugging
