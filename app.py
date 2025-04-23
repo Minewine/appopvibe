@@ -471,8 +471,8 @@ def form():
         logging.error(f"Error rendering form: {str(e)}", exc_info=True)
         return f"An error occurred while loading the form: {str(e)}", 500
 
+@app.route('/feedback/', methods=['GET', 'POST']) # Add route with trailing slash
 @app.route('/feedback', methods=['GET', 'POST'])
-# @app.route('/feedback/', methods=['GET', 'POST']) # Removed redundant trailing slash route
 # Rate limiting disabled for debugging
 def submit_feedback():
     """Process feedback submission and save to a markdown file."""
