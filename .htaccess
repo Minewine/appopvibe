@@ -25,5 +25,5 @@ RewriteCond %{REQUEST_FILENAME} !-d
 # Route all non-file requests to the Flask application
 RewriteRule ^(.*)$ /appopvibe/index.fcgi/$1 [QSA,L]
 
-# Fix the trailing slash issue
+# Fix the trailing slash issue 
 DirectorySlash On
