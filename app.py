@@ -277,8 +277,8 @@ def call_llm_api(prompt, temperature=0.7):
     logging.debug(f"Calling LLM API with model: {model}")
 
     try:
-        # Increased timeout as LLM calls can be slow
-        with httpx.Client(timeout=60.0) as client:
+        # Increased timeout as LLM calls can be slow (120 seconds instead of 60)
+        with httpx.Client(timeout=120.0) as client:
             response = client.post(url, json=payload, headers=headers)
             response.raise_for_status() # Raise HTTPStatusError for bad responses (4xx or 5xx)
             result = response.json()
@@ -505,8 +505,13 @@ def auto_detect_language(text):
 def index():
     """Render the landing page."""
     form = FeedbackForm() # Form for the feedback modal
-    # Flash messages handle feedback success/failure now
-    return render_template('landing.html', feedback_form=form) # Pass the feedback form
+    
+    # Check if redirected from successful feedback submission
+    show_success = request.args.get('feedback_success') == 'true'
+    
+    return render_template('landing.html', 
+                          feedback_form=form,
+                          show_success_message=show_success) # Pass success flag
 
 @app.route('/form', methods=['GET'])
 def form():
@@ -546,20 +551,28 @@ def submit_feedback():
         comments = form.comments.data
 
         if save_feedback(email, comments):
+            # Set flash message and ensure it's stored in session
             flash("Thank you for your feedback! We have received it.", "success")
+            # Force session to update to ensure flash message is saved
+            session.modified = True
             logging.info("Feedback form validated and saved.")
         else:
             flash("An error occurred while saving your feedback. Please try again later.", "danger")
+            session.modified = True
             logging.error("Failed to save feedback.")
     else:
         # Flash validation errors automatically by WTForms or manually iterate
         for field, errors in form.errors.items():
              for error in errors:
                   flash(f"Error in field '{form[field].label.text}': {error}", "danger")
+                  session.modified = True
         logging.warning(f"Feedback form validation failed: {form.errors}")
 
-    # Redirect back to the index page regardless of success/failure
-    return redirect(url_for('index'))
+    # Redirect back to the index page with success flag if feedback was saved
+    if save_feedback(email, comments):
+        return redirect(url_for('index', feedback_success='true'))
+    else:
+        return redirect(url_for('index'))
 
 @app.route('/submit', methods=['POST'])
 @limiter.limit("5 per hour") # Apply rate limit to analysis submissions
@@ -687,11 +700,32 @@ def internal_server_error(error):
     return render_template('500.html'), 500 # Assuming you have a 500.html template
 
 
-# Optional: Add a simple root path if APPLICATION_ROOT is used by a proxy
-if os.getenv('APPLICATION_ROOT', '/appopvibe'):
-    @app.route(os.getenv('APPLICATION_ROOT', '/appopvibe') + '/')
+# Optional: Add explicit routes with APPLICATION_ROOT prefix for proxy deployments
+app_root = os.getenv('APPLICATION_ROOT', '/appopvibe')
+if app_root and app_root != '/':
+    # Root path redirect
+    @app.route(f"{app_root}/")
     def root_redirect():
         return redirect(url_for('index'))
+    
+    # Explicit feedback route with APPLICATION_ROOT prefix
+    @app.route(f"{app_root}/feedback", methods=['GET', 'POST'])
+    def feedback_with_prefix():
+        return submit_feedback()
+    
+    # Explicitly handle form and submit routes with prefix
+    @app.route(f"{app_root}/form")
+    def form_with_prefix():
+        return form()
+    
+    @app.route(f"{app_root}/submit", methods=['POST'])
+    def submit_with_prefix():
+        return submit()
+    
+    # Add explicit route for report downloads with APPLICATION_ROOT prefix
+    @app.route(f"{app_root}/reports/<filename>")
+    def download_report_with_prefix(filename):
+        return download_report(filename)
 
 # Entry point for running the app
 if __name__ == '__main__':
