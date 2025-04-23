@@ -13,6 +13,6 @@ os.environ['USE_MOCK_DATA'] = 'true'  # Force using mock data to avoid API issue
 os.environ['SESSION_COOKIE_SECURE'] = 'true'  # Secure cookies with HTTPS
 
 # Import the Flask app after setting environment variables
-from app import app as application
+from app import app as application 
 
-# The variable 'application' is what Passenger looks for by default.
+# The variable 'application' is what Passenger looks for by default. new
