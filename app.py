@@ -116,7 +116,7 @@ ALLOWED_HTML_ATTRIBUTES = {
 # Initialize Flask application
 app = Flask(__name__)
 # Add this line to handle reverse proxies
-app.wsgi_app = ProxyFix(app.wsgi_app, x_prefix=1)
+# app.wsgi_app = ProxyFix(app.wsgi_app, x_prefix=1) # Commented out: Let Passenger handle SCRIPT_NAME
 
 # Apply Configuration
 app.config['SECRET_KEY'] = SECRET_KEY
@@ -128,8 +128,8 @@ app.config['PERMANENT_SESSION_LIFETIME'] = 3600 # Session lifetime in seconds
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH_BYTES
 app.config['REPORTS_FOLDER'] = REPORTS_FOLDER
 app.config['FEEDBACK_FOLDER'] = FEEDBACK_FOLDER
-app.config['APPLICATION_ROOT'] = os.getenv('APPLICATION_ROOT', '/appopvibe')
-app.config['SESSION_COOKIE_PATH'] = os.getenv('APPLICATION_ROOT', '/appopvibe')
+# app.config['APPLICATION_ROOT'] = os.getenv('APPLICATION_ROOT', '/appopvibe') # Commented out: Let Flask detect from SCRIPT_NAME
+# app.config['SESSION_COOKIE_PATH'] = os.getenv('APPLICATION_ROOT', '/appopvibe') # Commented out: Default should work
 
 # Session type config - enable filesystem sessions for better reliability
 app.config['SESSION_TYPE'] = 'filesystem'
@@ -424,6 +424,7 @@ def index():
 @app.route('/form', methods=['GET'])
 def form():
     """Render the CV analysis form."""
+    logging.info(f"Entered form() route for path: {request.path}") # Added log
     try:
         logging.debug("Form route accessed")
         # Check if templates directory exists
@@ -471,10 +472,11 @@ def form():
         return f"An error occurred while loading the form: {str(e)}", 500
 
 @app.route('/feedback', methods=['GET', 'POST'])
-@app.route('/feedback/', methods=['GET', 'POST'])  # Added trailing slash variant to fix 404s
+# @app.route('/feedback/', methods=['GET', 'POST']) # Removed redundant trailing slash route
 # Rate limiting disabled for debugging
 def submit_feedback():
     """Process feedback submission and save to a markdown file."""
+    logging.info(f"Entered submit_feedback() route for path: {request.path}") # Added log
     form = FeedbackForm()
     
     # If it's a GET request, just render the feedback form
@@ -635,48 +637,6 @@ def internal_server_error(error):
     # You could render a specific 500.html template if needed
     return render_template('500.html'), 500 # Assuming you have a 500.html template
 
-
-# Direct, top-level routes for critical paths to avoid routing issues
-@app.route('/appopvibe/feedback/', methods=['GET', 'POST'])
-@app.route('/appopvibe/feedback', methods=['GET', 'POST'])
-def direct_feedback_route():
-    """Hard-coded route to ensure feedback works regardless of APPLICATION_ROOT settings"""
-    logging.debug(f"Direct feedback route accessed: {request.path}")
-    return submit_feedback()
-
-@app.route('/appopvibe/form')
-@app.route('/appopvibe/form/')
-def direct_form_route():
-    """Hard-coded route to ensure form works regardless of APPLICATION_ROOT settings"""
-    logging.debug(f"Direct form route accessed: {request.path}")
-    return form()
-
-# Optional: Add explicit routes with APPLICATION_ROOT prefix for proxy deployments
-app_root = os.getenv('APPLICATION_ROOT', '/')
-
-if app_root and app_root != '/':
-    # Explicit feedback route with APPLICATION_ROOT prefix  
-    @app.route(f"{app_root}/feedback", methods=['GET', 'POST'])
-    def feedback_with_prefix():
-        return submit_feedback()
-    
-    @app.route(f"{app_root}/feedback/", methods=['GET', 'POST'])
-    def feedback_with_prefix_slash():
-        return submit_feedback()
-    
-    # Explicitly handle form and submit routes with prefix
-    @app.route(f"{app_root}/form")
-    def form_with_prefix():
-        return form()
-    
-    @app.route(f"{app_root}/submit", methods=['POST'])
-    def submit_with_prefix():
-        return submit()
-    
-    # Add explicit route for report downloads with APPLICATION_ROOT prefix
-    @app.route(f"{app_root}/reports/<filename>")
-    def download_report_with_prefix(filename):
-        return download_report(filename)
 
 # Entry point for running the app
 if __name__ == '__main__':
