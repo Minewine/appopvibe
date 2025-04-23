@@ -52,10 +52,13 @@ MAX_CONTENT_LENGTH_BYTES = MAX_CONTENT_SIZE_KB * 1024
 REPORT_RETENTION_DAYS = int(os.getenv('REPORT_RETENTION_DAYS', 30))
 
 # LLM API Configuration
-OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', 'REPLACE_WITH_YOUR_OPENROUTER_KEY_OR_REMOVE')
-# IMPORTANT: Remove or replace the hardcoded API key above if this is committed publicly.
-if OPENROUTER_API_KEY == 'REPLACE_WITH_YOUR_OPENROUTER_KEY_OR_REMOVE':
-     logging.warning("OPENROUTER_API_KEY is not set via environment variable. Using default placeholder.")
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+# Print the key for debugging (truncated for security)
+if OPENROUTER_API_KEY:
+    key_preview = OPENROUTER_API_KEY[:6] + "..." + OPENROUTER_API_KEY[-4:] if len(OPENROUTER_API_KEY) > 10 else "[too short]"
+    logging.info(f"OpenRouter API Key loaded: {key_preview}")
+else:
+    logging.warning("OPENROUTER_API_KEY is not set via environment variable.")
 
 DEFAULT_MODEL = os.getenv('DEFAULT_MODEL', 'deepseek/deepseek-chat-v3-0324')
 
@@ -179,84 +182,52 @@ class FeedbackForm(FlaskForm):
 
 # 3. Helper Functions and Service Logic
 
+
+
 def call_llm_api(prompt, temperature=0.7):
-    """Calls the OpenRouter API with a given prompt."""
-    if not OPENROUTER_API_KEY or OPENROUTER_API_KEY == 'REPLACE_WITH_YOUR_OPENROUTER_KEY_OR_REMOVE':
-        logging.error("OpenRouter API key not configured.")
-        return "Error: API key not configured. Please set up your OPENROUTER_API_KEY environment variable."
-    
-    # Debug API key (truncated for security)
-    api_key_preview = OPENROUTER_API_KEY[:6] + "..." + OPENROUTER_API_KEY[-4:] if len(OPENROUTER_API_KEY) > 10 else "too short"
-    logging.debug(f"Using API key: {api_key_preview}")
+    """Calls the Groq API with a given prompt."""
+    api_key = os.getenv('GROQ_API_KEY')
+    if not api_key:
+        logging.error("Groq API key not found in environment.")
+        return "Error: API key not configured. Please set up your GROQ_API_KEY environment variable."
 
-    url = "https://openrouter.ai/api/v1/chat/completions"
+    url = "https://api.groq.com/openai/v1/chat/completions"  # Replace with Groq's endpoint
+
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        # Use X-Title for identification on OpenRouter dashboard
-        "X-Title": "CV Analyzer",
-         # Required if API key is linked to a specific site
-        "HTTP-Referer": os.getenv('OPENROUTER_REFERER', 'https://rametric.com'),
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
     }
-    
-    # Debug headers
-    logging.debug(f"Request headers: Authorization: Bearer {api_key_preview}, Content-Type: application/json")
-
-    # LLM Model
-    model = DEFAULT_MODEL
-
-    # Truncate prompt if necessary (LLM APIs have token limits)
-    # Note: This is a crude truncation. A proper tokenization approach is better.
-    max_prompt_length = 3800 # Characters is a proxy for tokens
-    truncated_prompt = prompt[:max_prompt_length]
-    if len(prompt) > max_prompt_length:
-        logging.warning(f"Prompt truncated from {len(prompt)} to {max_prompt_length} characters.")
 
     payload = {
-        "model": model,
-        "messages": [{"role": "user", "content": truncated_prompt}],
-        "temperature": temperature,
-        "stream": False # Sync call for simplicity in this example
+        "model": "llama-3.3-70b-versatile",  # Update if Groq uses a different model format
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": temperature
     }
 
-    logging.debug(f"Calling LLM API with model: {model}")
-
     try:
-        # Increased timeout as LLM calls can be slow (120 seconds instead of 60)
         with httpx.Client(timeout=120.0) as client:
             response = client.post(url, json=payload, headers=headers)
-            response.raise_for_status() # Raise HTTPStatusError for bad responses (4xx or 5xx)
+            response.raise_for_status()
             result = response.json()
 
             if 'choices' in result and result['choices']:
-                content = result['choices'][0]['message']['content']
-                logging.info("LLM API call successful.")
+                content = result['choices'][0]['message']['content'] 
+                logging.info("Groq API call successful.")
                 return content
             else:
-                logging.error(f"LLM API response missing 'choices': {result}")
+                logging.error(f"Groq API response missing 'choices': {result}")
                 return "Error: Invalid response format from API."
 
     except httpx.HTTPStatusError as e:
-        error_msg = f"HTTP status error from LLM API: {e.response.status_code} - {e.response.text}"
-        logging.error(error_msg, exc_info=True)
-        
-        # Attempt to return API error message if available
-        try:
-            error_json = e.response.json()
-            if 'error' in error_json and 'message' in error_json['error']:
-                 error_msg += f" Details: {error_json['error']['message']}"
-        except:
-            pass # Ignore JSON parsing errors on response text
-
-        return f"Error: {error_msg}"
+        logging.error(f"HTTP status error from Groq API: {e.response.status_code} - {e.response.text}", exc_info=True)
+        return f"Error: {e.response.text}"
     except httpx.RequestError as e:
-        error_msg = f"HTTP request error occurred during LLM API call: {str(e)}"
-        logging.error(error_msg, exc_info=True)
-        return f"Error: {error_msg}"
+        logging.error(f"HTTP request error occurred during Groq API call: {str(e)}", exc_info=True)
+        return f"Error: {str(e)}"
     except Exception as e:
-        error_msg = f"An unexpected error occurred during LLM API call: {str(e)}"
-        logging.error(error_msg, exc_info=True)
-        return f"Error: {error_msg}"
+        logging.error(f"An unexpected error occurred during Groq API call: {str(e)}", exc_info=True)
+        return f"Error: {str(e)}"
+
 
 def analyze_cv_jd(cv_text, jd_text, language):
     """Generates analysis using LLM API."""
