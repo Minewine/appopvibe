@@ -15,17 +15,18 @@ if 'MOCK_REPORT_PATH' in os.environ:
     del os.environ['MOCK_REPORT_PATH']
 
 # Set important environment variables before importing the app
-os.environ['SCRIPT_NAME'] = '/appopvibe'
-os.environ['APPLICATION_ROOT'] = '/appopvibe'
-# Debug mode for development
-os.environ['FLASK_DEBUG'] = 'true'  # Enable Flask debugging
-os.environ['SESSION_COOKIE_SECURE'] = 'true'  # Secure cookies with HTTPS
+# os.environ['SCRIPT_NAME'] = '/appopvibe' # Let Passenger handle this via PassengerBaseURI
+# os.environ['APPLICATION_ROOT'] = '/appopvibe' # Let Passenger handle this via PassengerBaseURI
+# Debug mode for development - MUST be false in production
+os.environ['FLASK_DEBUG'] = 'false' # Disable Flask debugging for production
+# os.environ['SESSION_COOKIE_SECURE'] = 'true' # Let .htaccess or hosting panel handle this
 
 # Server configuration - increase process limits to prevent errors
 os.environ['LSAPI_CHILDREN'] = '12'  # Increase from 6 to 12 child processes
 os.environ['LSAPI_MAX_IDLE'] = '600'  # Increase max idle time
 os.environ['LSAPI_MAX_PROCESS_TIME'] = '600'  # Increase max process time to 600 seconds
-os.environ['GROQ_API_KEY'] = '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'
+# os.environ['GROQ_API_KEY'] = '...' # Let .htaccess or hosting panel handle this
+
 # Import the Flask app after setting environment variables
 from app import app as application 
 
