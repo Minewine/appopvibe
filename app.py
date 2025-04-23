@@ -701,13 +701,9 @@ def internal_server_error(error):
 
 
 # Optional: Add explicit routes with APPLICATION_ROOT prefix for proxy deployments
-app_root = os.getenv('APPLICATION_ROOT', '/appopvibe')
+app_root = os.getenv('APPLICATION_ROOT', '/')
+
 if app_root and app_root != '/':
-    # Root path redirect
-    @app.route(f"{app_root}/")
-    def root_redirect():
-        return redirect(url_for('index'))
-    
     # Explicit feedback route with APPLICATION_ROOT prefix
     @app.route(f"{app_root}/feedback", methods=['GET', 'POST'])
     def feedback_with_prefix():
