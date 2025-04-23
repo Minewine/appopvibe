@@ -184,6 +184,10 @@ def call_llm_api(prompt, temperature=0.7):
     if not OPENROUTER_API_KEY or OPENROUTER_API_KEY == 'REPLACE_WITH_YOUR_OPENROUTER_KEY_OR_REMOVE':
         logging.error("OpenRouter API key not configured.")
         return "Error: API key not configured. Please set up your OPENROUTER_API_KEY environment variable."
+    
+    # Debug API key (truncated for security)
+    api_key_preview = OPENROUTER_API_KEY[:6] + "..." + OPENROUTER_API_KEY[-4:] if len(OPENROUTER_API_KEY) > 10 else "too short"
+    logging.debug(f"Using API key: {api_key_preview}")
 
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
@@ -194,6 +198,9 @@ def call_llm_api(prompt, temperature=0.7):
          # Required if API key is linked to a specific site
         "HTTP-Referer": os.getenv('OPENROUTER_REFERER', 'https://rametric.com'),
     }
+    
+    # Debug headers
+    logging.debug(f"Request headers: Authorization: Bearer {api_key_preview}, Content-Type: application/json")
 
     # LLM Model
     model = DEFAULT_MODEL
@@ -466,6 +473,7 @@ def form():
     return render_template('form.html', form=form)
 
 @app.route('/feedback', methods=['GET', 'POST'])
+@app.route('/feedback/', methods=['GET', 'POST'])  # Added trailing slash variant to fix 404s
 # Rate limiting disabled for debugging
 def submit_feedback():
     """Process feedback submission and save to a markdown file."""
@@ -479,17 +487,22 @@ def submit_feedback():
     if form.validate_on_submit():
         email = form.email.data
         comments = form.comments.data
+        
+        logging.debug(f"Processing feedback submission from {email}")
 
-        if save_feedback(email, comments):
+        success = save_feedback(email, comments)
+        if success:
             # Set flash message and ensure it's stored in session
             flash("Thank you for your feedback! We have received it.", "success")
             # Force session to update to ensure flash message is saved
             session.modified = True
-            logging.info("Feedback form validated and saved.")
+            logging.info("Feedback form validated and saved successfully")
+            return redirect(url_for('index', feedback_success='true'))
         else:
             flash("An error occurred while saving your feedback. Please try again later.", "danger")
             session.modified = True
-            logging.error("Failed to save feedback.")
+            logging.error("Failed to save feedback")
+            return redirect(url_for('index'))
     else:
         # Flash validation errors automatically by WTForms or manually iterate
         for field, errors in form.errors.items():
@@ -497,12 +510,7 @@ def submit_feedback():
                   flash(f"Error in field '{form[field].label.text}': {error}", "danger")
                   session.modified = True
         logging.warning(f"Feedback form validation failed: {form.errors}")
-
-    # Redirect back to the index page with success flag if feedback was saved
-    if save_feedback(email, comments):
-        return redirect(url_for('index', feedback_success='true'))
-    else:
-        return redirect(url_for('index'))
+        return render_template('feedback.html', form=form)
 
 @app.route('/submit', methods=['POST'])
 # Rate limiting disabled for debugging

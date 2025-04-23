@@ -8,12 +8,23 @@ project_home = os.path.dirname(os.path.abspath(__file__))
 if project_home not in sys.path:
     sys.path.insert(0, project_home)
 
+# Clear any USE_MOCK_DATA environment variables to avoid conflicts
+if 'USE_MOCK_DATA' in os.environ:
+    del os.environ['USE_MOCK_DATA']
+if 'MOCK_REPORT_PATH' in os.environ:
+    del os.environ['MOCK_REPORT_PATH']
+
 # Set important environment variables before importing the app
 os.environ['SCRIPT_NAME'] = '/appopvibe'
 os.environ['APPLICATION_ROOT'] = '/appopvibe'
 # Debug mode for development
 os.environ['FLASK_DEBUG'] = 'true'  # Enable Flask debugging
 os.environ['SESSION_COOKIE_SECURE'] = 'true'  # Secure cookies with HTTPS
+
+# Server configuration - increase process limits to prevent errors
+os.environ['LSAPI_CHILDREN'] = '12'  # Increase from 6 to 12 child processes
+os.environ['LSAPI_MAX_IDLE'] = '600'  # Increase max idle time
+os.environ['LSAPI_MAX_PROCESS_TIME'] = '600'  # Increase max process time to 600 seconds
 
 # Import the Flask app after setting environment variables
 from app import app as application 
@@ -72,4 +83,10 @@ class URLTracingMiddleware:
 # Wrap the application with our middleware
 application = URLTracingMiddleware(application)
 
-# The variable 'application' is what Passenger looks for by default. new
+# Print debug information to help diagnose issues
+print("Passenger WSGI script loaded")
+print(f"LSAPI_CHILDREN set to: {os.environ.get('LSAPI_CHILDREN', 'Not set')}")
+print(f"Python path: {sys.path}")
+print(f"Working directory: {os.getcwd()}")
+
+# The variable 'application' is what Passenger looks for by default.
