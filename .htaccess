@@ -9,6 +9,7 @@ PassengerPython "/home/ramemvpl/virtualenv/public_html/appopvibe/3.9/bin/python"
 SetEnv DEFAULT_MODEL deepseek/deepseek-chat-v3-0324
 SetEnv MAX_CONTENT_SIZE_KB 30
 SetEnv OPENROUTER_API_KEY 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
+SetEnv GROQ_API_KEY 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
 SetEnv REPORT_RETENTION_DAYS 30
 SetEnv FLASK_DEBUG True
 SetEnv SESSION_COOKIE_SECURE True

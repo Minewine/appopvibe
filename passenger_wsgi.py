@@ -25,7 +25,7 @@ os.environ['SESSION_COOKIE_SECURE'] = 'true'  # Secure cookies with HTTPS
 os.environ['LSAPI_CHILDREN'] = '12'  # Increase from 6 to 12 child processes
 os.environ['LSAPI_MAX_IDLE'] = '600'  # Increase max idle time
 os.environ['LSAPI_MAX_PROCESS_TIME'] = '600'  # Increase max process time to 600 seconds
-
+os.environ['GROQ_API_KEY'] = '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'
 # Import the Flask app after setting environment variables
 from app import app as application 
 
