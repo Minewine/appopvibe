@@ -454,28 +454,50 @@ def index():
 def form():
     """Render the CV analysis form."""
     try:
-        form = CVAnalysisForm()
-        logging.debug("Created form instance")
+        logging.debug("Form route accessed")
+        # Check if templates directory exists
+        template_path = os.path.join(APP_ROOT, 'templates', 'form.html')
+        logging.debug(f"Looking for template at: {template_path}")
+        if os.path.exists(template_path):
+            logging.debug("form.html template exists")
+        else:
+            logging.error(f"form.html template NOT FOUND at: {template_path}")
+            
+        # Create form with try/except around each step
+        try:
+            form = CVAnalysisForm()
+            logging.debug("Created form instance successfully")
+        except Exception as form_error:
+            logging.error(f"Failed to create form instance: {str(form_error)}", exc_info=True)
+            return "Form initialization error. Check logs for details.", 500
         
         # Pre-fill the form with default values if fields are empty
-        if not form.cv.data:
-            form.cv.data = default_cv
-            logging.debug("Set default CV text")
+        try:
+            if not form.cv.data:
+                form.cv.data = default_cv
+                logging.debug("Set default CV text")
+                
+            if not form.jd.data:
+                form.jd.data = default_jd
+                logging.debug("Set default JD text")
+        except Exception as prefill_error:
+            logging.error(f"Error pre-filling form: {str(prefill_error)}", exc_info=True)
+            # Continue despite this error
             
-        if not form.jd.data:
-            form.jd.data = default_jd
-            logging.debug("Set default JD text")
-
-        # Simplify language detection to avoid potential errors
+        # Set default language
         form.language.data = 'en'  # Default to English 
         logging.debug("Form prepared successfully")
         
-        return render_template('form.html', form=form)
+        # Render with detailed logging
+        try:
+            return render_template('form.html', form=form)
+        except Exception as render_error:
+            logging.error(f"Template rendering error: {str(render_error)}", exc_info=True)
+            return f"Template error: {str(render_error)}", 500
         
     except Exception as e:
         logging.error(f"Error rendering form: {str(e)}", exc_info=True)
-        flash("An error occurred while loading the form. Please try again.", "danger")
-        return redirect(url_for('index'))
+        return f"An error occurred while loading the form: {str(e)}", 500
 
 @app.route('/feedback', methods=['GET', 'POST'])
 @app.route('/feedback/', methods=['GET', 'POST'])  # Added trailing slash variant to fix 404s
@@ -650,6 +672,13 @@ def direct_feedback_route():
     """Hard-coded route to ensure feedback works regardless of APPLICATION_ROOT settings"""
     logging.debug(f"Direct feedback route accessed: {request.path}")
     return submit_feedback()
+
+@app.route('/appopvibe/form')
+@app.route('/appopvibe/form/')
+def direct_form_route():
+    """Hard-coded route to ensure form works regardless of APPLICATION_ROOT settings"""
+    logging.debug(f"Direct form route accessed: {request.path}")
+    return form()
 
 # Optional: Add explicit routes with APPLICATION_ROOT prefix for proxy deployments
 app_root = os.getenv('APPLICATION_ROOT', '/')
