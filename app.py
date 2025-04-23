@@ -638,11 +638,19 @@ def internal_server_error(error):
     return render_template('500.html'), 500 # Assuming you have a 500.html template
 
 
+# Direct, top-level routes for critical paths to avoid routing issues
+@app.route('/appopvibe/feedback/', methods=['GET', 'POST'])
+@app.route('/appopvibe/feedback', methods=['GET', 'POST'])
+def direct_feedback_route():
+    """Hard-coded route to ensure feedback works regardless of APPLICATION_ROOT settings"""
+    logging.debug(f"Direct feedback route accessed: {request.path}")
+    return submit_feedback()
+
 # Optional: Add explicit routes with APPLICATION_ROOT prefix for proxy deployments
 app_root = os.getenv('APPLICATION_ROOT', '/')
 
 if app_root and app_root != '/':
-    # Explicit feedback route with APPLICATION_ROOT prefix
+    # Explicit feedback route with APPLICATION_ROOT prefix  
     @app.route(f"{app_root}/feedback", methods=['GET', 'POST'])
     def feedback_with_prefix():
         return submit_feedback()
