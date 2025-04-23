@@ -58,8 +58,6 @@ if OPENROUTER_API_KEY == 'REPLACE_WITH_YOUR_OPENROUTER_KEY_OR_REMOVE':
      logging.warning("OPENROUTER_API_KEY is not set via environment variable. Using default placeholder.")
 
 DEFAULT_MODEL = os.getenv('DEFAULT_MODEL', 'deepseek/deepseek-chat-v3-0324')
-USE_MOCK_DATA = os.getenv('USE_MOCK_DATA', 'true').lower() == 'true'
-MOCK_REPORT_PATH = os.path.join(REPORTS_FOLDER, 'report_2025-04-21T05-05-11Z.md')
 
 
 # Supported Languages and Prompts
@@ -95,6 +93,9 @@ except ImportError as e:
     default_cv = "Paste your CV here..."
     default_jd = "Paste the Job Description here..."
 
+# Set debug logging level
+logging.getLogger().setLevel(logging.DEBUG)
+logging.debug("Debug logging enabled")
 
 # Bleach Allowed Tags (for sanitizing HTML output)
 ALLOWED_HTML_TAGS = [
@@ -178,74 +179,11 @@ class FeedbackForm(FlaskForm):
 
 # 3. Helper Functions and Service Logic
 
-def load_mock_report_sections(filepath):
-    """Loads and parses mock analysis and rewrite sections from a file."""
-    if not os.path.exists(filepath):
-        logging.error(f"Mock report file not found: {filepath}")
-        return {"analysis": "Error: Mock report file not found.", "rewrite": "Error: Mock report file not found."}
-
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            content = f.read()
-
-        analysis = "Error: Could not find analysis section in mock report."
-        rewrite = "Error: Could not find Rewritten CV section in mock report."
-
-        # Extract the LLM Analysis section
-        analysis_start = content.find('## LLM Analysis')
-        rewrite_start = content.find('## Rewritten CV')
-
-        if analysis_start != -1:
-            analysis_content = content[analysis_start + len('## LLM Analysis'):]
-            if rewrite_start != -1 and rewrite_start > analysis_start:
-                # Analysis ends before rewrite section
-                analysis = analysis_content[:rewrite_start - analysis_start - len('## LLM Analysis')].strip()
-            else:
-                 # Analysis goes to the end of the file if no rewrite section
-                 analysis = analysis_content.strip()
-
-        # Extract the Rewritten CV section
-        if rewrite_start != -1:
-            rewrite_content = content[rewrite_start + len('## Rewritten CV'):].strip()
-            # Assuming rewritten CV is in a code block
-            code_block_start = rewrite_content.find('```')
-            if code_block_start != -1:
-                code_block_content = rewrite_content[code_block_start + 3:].strip()
-                code_block_end = code_block_content.find('```')
-                if code_block_end != -1:
-                    rewrite = code_block_content[:code_block_end].strip()
-                else:
-                    rewrite = code_block_content.strip() # No closing ```? Use rest of content
-            else:
-                 rewrite = rewrite_content # Not in a code block? Use content after heading
-
-
-        logging.info(f"Loaded mock data from {filepath}")
-        return {"analysis": analysis, "rewrite": rewrite}
-
-    except Exception as e:
-        logging.error(f"Error reading or parsing mock report file: {str(e)}", exc_info=True)
-        return {"analysis": f"Error loading mock data: {str(e)}", "rewrite": f"Error loading mock data: {str(e)}"}
-
-# Store mock data in request-local storage after the first load
-@app.before_request
-def load_mock_data_if_enabled():
-    """Load mock data into request context if mock mode is enabled."""
-    if USE_MOCK_DATA and 'mock_data' not in g:
-        g.mock_data = load_mock_report_sections(MOCK_REPORT_PATH)
-
-
 def call_llm_api(prompt, temperature=0.7):
-    """Calls the OpenRouter API with a given prompt. Falls back to mock data on authentication failure."""
+    """Calls the OpenRouter API with a given prompt."""
     if not OPENROUTER_API_KEY or OPENROUTER_API_KEY == 'REPLACE_WITH_YOUR_OPENROUTER_KEY_OR_REMOVE':
-        logging.error("OpenRouter API key not configured. Falling back to mock data.")
-        # Fall back to mock data if API key is missing
-        if hasattr(g, 'mock_data'):
-            return g.mock_data.get('analysis', "Error: Mock data not available")
-        else:
-            # Load mock data if not already loaded
-            mock_data = load_mock_report_sections(MOCK_REPORT_PATH)
-            return mock_data.get('analysis', "Error: Failed to load mock data")
+        logging.error("OpenRouter API key not configured.")
+        return "Error: API key not configured. Please set up your OPENROUTER_API_KEY environment variable."
 
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
@@ -295,16 +233,6 @@ def call_llm_api(prompt, temperature=0.7):
         error_msg = f"HTTP status error from LLM API: {e.response.status_code} - {e.response.text}"
         logging.error(error_msg, exc_info=True)
         
-        # Fall back to mock data for authentication errors (401)
-        if e.response.status_code == 401:
-            logging.warning("Authentication failed. Falling back to mock data.")
-            if hasattr(g, 'mock_data'):
-                return g.mock_data.get('analysis', "Error: Mock data not available")
-            else:
-                # Load mock data if not already loaded
-                mock_data = load_mock_report_sections(MOCK_REPORT_PATH)
-                return mock_data.get('analysis', "Error: Failed to load mock data")
-        
         # Attempt to return API error message if available
         try:
             error_json = e.response.json()
@@ -324,34 +252,36 @@ def call_llm_api(prompt, temperature=0.7):
         return f"Error: {error_msg}"
 
 def analyze_cv_jd(cv_text, jd_text, language):
-    """Generates analysis using LLM or mock data."""
+    """Generates analysis using LLM API."""
+    logging.debug(f"Starting CV analysis for language: {language}")
+    
     if language not in PROMPT_TEMPLATES or 'analysis' not in PROMPT_TEMPLATES[language]:
          logging.error(f"Analysis prompt template missing for language: {language}")
          return "Error: Configuration error for analysis prompt."
 
-    if USE_MOCK_DATA:
-        logging.info("Using mock data for analysis.")
-        # Access mock data from request context if loaded
-        return getattr(g, 'mock_data', {}).get('analysis', 'Error: Mock analysis data not loaded.')
-
     analysis_template = PROMPT_TEMPLATES[language]['analysis']
     analysis_prompt = analysis_template.format(cv=cv_text, jd=jd_text)
-    return call_llm_api(analysis_prompt)
+    logging.debug(f"Analysis prompt prepared, length: {len(analysis_prompt)}")
+    
+    result = call_llm_api(analysis_prompt)
+    logging.debug(f"Analysis completed, result length: {len(result) if result else 0}")
+    return result
 
 def rewrite_cv(cv_text, jd_text, language):
-    """Generates rewritten CV using LLM or mock data."""
+    """Generates rewritten CV using LLM API."""
+    logging.debug(f"Starting CV rewriting for language: {language}")
+    
     if language not in PROMPT_TEMPLATES or 'rewrite' not in PROMPT_TEMPLATES[language]:
         logging.error(f"Rewrite prompt template missing for language: {language}")
         return "Error: Configuration error for rewrite prompt."
 
-    if USE_MOCK_DATA:
-        logging.info("Using mock data for CV rewrite.")
-        # Access mock data from request context if loaded
-        return getattr(g, 'mock_data', {}).get('rewrite', 'Error: Mock rewrite data not loaded.')
-
     rewrite_template = PROMPT_TEMPLATES[language]['rewrite']
     rewrite_prompt = rewrite_template.format(cv=cv_text, jd=jd_text)
-    return call_llm_api(rewrite_prompt)
+    logging.debug(f"Rewrite prompt prepared, length: {len(rewrite_prompt)}")
+    
+    result = call_llm_api(rewrite_prompt)
+    logging.debug(f"CV rewrite completed, result length: {len(result) if result else 0}")
+    return result
 
 def sanitize_html_output(html_text):
     """Sanitizes HTML content to prevent XSS attacks."""
@@ -536,7 +466,7 @@ def form():
     return render_template('form.html', form=form)
 
 @app.route('/feedback', methods=['GET', 'POST'])
-@limiter.limit("10 per day") # Apply rate limit to feedback submissions
+# Rate limiting disabled for debugging
 def submit_feedback():
     """Process feedback submission and save to a markdown file."""
     form = FeedbackForm()
@@ -575,7 +505,7 @@ def submit_feedback():
         return redirect(url_for('index'))
 
 @app.route('/submit', methods=['POST'])
-@limiter.limit("5 per hour") # Apply rate limit to analysis submissions
+# Rate limiting disabled for debugging
 def submit():
     """Process the submitted CV and JD, generate analysis, and display results."""
     form = CVAnalysisForm()
@@ -728,5 +658,4 @@ if __name__ == '__main__':
     # In production, use a production-ready server like Gunicorn or uWSGI
     # app.run(debug=True, host='0.0.0.0')
     print("Running development server. Use a production server like Gunicorn/uWSGI in production.")
-    print(f"Mock data is {'ENABLED' if USE_MOCK_DATA else 'DISABLED'}.")
     app.run(debug=os.getenv('FLASK_DEBUG') == '1', host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
