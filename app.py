@@ -647,6 +647,10 @@ if app_root and app_root != '/':
     def feedback_with_prefix():
         return submit_feedback()
     
+    @app.route(f"{app_root}/feedback/", methods=['GET', 'POST'])
+    def feedback_with_prefix_slash():
+        return submit_feedback()
+    
     # Explicitly handle form and submit routes with prefix
     @app.route(f"{app_root}/form")
     def form_with_prefix():
