@@ -1,35 +1,38 @@
 """
-Ultra-simple passenger_wsgi.py that only imports mini_app
-Contains no Unicode characters whatsoever for maximum compatibility
+Absolutely minimal WSGI script with no dependencies
+Uses only ASCII characters and avoids any fancy features
 """
 import os
 import sys
 
-# Get the current directory and add it to Python path if needed
-project_home = os.path.dirname(os.path.abspath(__file__))
-if project_home not in sys.path:
-    sys.path.insert(0, project_home)
-
-# Debug mode for development - MUST be false in production
-os.environ['FLASK_DEBUG'] = 'false'
-
-# Basic application for testing in case imports fail
-def simple_app(environ, start_response):
+# Basic application that always works
+def application(environ, start_response):
     status = '200 OK'
-    response_headers = [('Content-type', 'text/plain')]
+    response_headers = [('Content-type', 'text/html')]
+    
+    html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Basic WSGI App</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+            .success { color: green; font-weight: bold; }
+        </style>
+    </head>
+    <body>
+        <h1>Basic WSGI Application</h1>
+        <p class="success">SUCCESS: Basic WSGI is working!</p>
+        <p>Python version: %s</p>
+        <p>Working directory: %s</p>
+    </body>
+    </html>
+    """ % (sys.version, os.getcwd())
+    
     start_response(status, response_headers)
-    return [b'AppOpVibe simple fallback is running.']
+    return [html.encode('ascii', 'replace')]
 
-# Very simple import logic using only ASCII characters
-try:
-    # Try to import from mini_app.py
-    from mini_app import app as application
-    print("Mini app successfully imported")
-except Exception as e:
-    # Fall back to simple app
-    error_str = str(e).encode('ascii', 'replace').decode('ascii')
-    print("Error importing mini_app: " + error_str)
-    application = simple_app
-
-# The variable 'application' is what Passenger looks for by default
-print("Simple passenger_wsgi.py loaded")
+# Print debug information
+print("Ultra-simple WSGI script loaded")
+print("Python version: " + sys.version)
+print("Working directory: " + os.getcwd())
