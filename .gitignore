@@ -41,3 +41,4 @@ venv.bak/
 
 # Reports - Optional, depends if you want to track them
 # reports/
+.env

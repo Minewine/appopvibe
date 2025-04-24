@@ -8,70 +8,101 @@
         <h1 class="mb-4">CV vs Job Description Analyzer</h1>
         <p class="lead">Compare your CV against a job description to receive AI-powered analysis and optimization suggestions.</p>
         
-        <form method="POST" action="{{ url_for('submit') }}">
-            <!-- CSRF token protection disabled due to session issues on the server -->
-            {{ form.csrf_token }} 
-            <!-- Using hardcoded value as workaround -->
-            <input type="hidden" name="csrf_token" value="static-csrf-token-for-debugging">
-            <div class="row mb-4">
-                <div class="col-md-6">
-                    <div class="form-group mb-3">
-                        <label for="cv" class="form-label">Your CV/Resume</label>
-                        <textarea class="form-control" id="cv" name="cv" rows="15" required>{{ form.cv.data or '' }}</textarea>
-                        <div class="form-text">Paste the full text of your CV/Resume</div>
+        <div x-data="{ loading: false, charCount: { cv: 0, jd: 0 } }">
+            <form @submit="loading = true" method="POST" action="{{ url_for('main.analyze') }}">
+                <!-- Proper CSRF token protection -->
+                {{ form.csrf_token }}
+                
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="form-group mb-3">
+                            <label for="cv" class="form-label">Your CV/Resume</label>
+                            <textarea 
+                                class="form-control" 
+                                id="cv" 
+                                name="cv" 
+                                rows="15" 
+                                required
+                                x-on:input="charCount.cv = $event.target.value.length"
+                                >{{ form.cv.data or '' }}</textarea>
+                            <div class="form-text d-flex justify-content-between">
+                                <span>Paste the full text of your CV/Resume</span>
+                                <span x-text="charCount.cv + ' characters'"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group mb-3">
+                            <label for="jd" class="form-label">Job Description</label>
+                            <textarea 
+                                class="form-control" 
+                                id="jd" 
+                                name="jd" 
+                                rows="15" 
+                                required
+                                x-on:input="charCount.jd = $event.target.value.length"
+                                >{{ form.jd.data or '' }}</textarea>
+                            <div class="form-text d-flex justify-content-between">
+                                <span>Paste the full job description text</span>
+                                <span x-text="charCount.jd + ' characters'"></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-6">
-                    <div class="form-group mb-3">
-                        <label for="jd" class="form-label">Job Description</label>
-                        <textarea class="form-control" id="jd" name="jd" rows="15" required>{{ form.jd.data or '' }}</textarea>
-                        <div class="form-text">Paste the full job description text</div>
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="language" class="form-label">Language</label>
+                            <select class="form-select" id="language" name="language">
+                                <option value="en" {% if form.language.data == 'en' or not form.language.data %}selected{% endif %}>English</option>
+                                <option value="fr" {% if form.language.data == 'fr' %}selected{% endif %}>Français</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check mt-4">
+                            <input class="form-check-input" type="checkbox" id="rewrite_cv" name="rewrite_cv" {% if form.rewrite_cv.data %}checked{% endif %}>
+                            <label class="form-check-label" for="rewrite_cv">
+                                Rewrite my CV optimized for ATS
+                            </label>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="row mb-4">
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label for="language" class="form-label">Language</label>
-                        <select class="form-select" id="language" name="language">
-                            <option value="en" {% if form.language.data == 'en' or not form.language.data %}selected{% endif %}>English</option>
-                            <option value="fr" {% if form.language.data == 'fr' %}selected{% endif %}>Français</option>
-                        </select>
-                    </div>
+                <div class="d-grid gap-2">
+                    <button 
+                        type="submit" 
+                        class="btn btn-primary btn-lg" 
+                        :disabled="loading">
+                        <span 
+                            class="spinner-border spinner-border-sm" 
+                            role="status" 
+                            aria-hidden="true"
+                            x-show="loading"></span>
+                        <span x-text="loading ? ' Analyzing...' : 'Analyze'"></span>
+                    </button>
                 </div>
-                <div class="col-md-6">
-                    <div class="form-check mt-4">
-                        <input class="form-check-input" type="checkbox" id="rewrite_cv" name="rewrite_cv" {% if form.rewrite_cv.data %}checked{% endif %}>
-                        <label class="form-check-label" for="rewrite_cv">
-                            Rewrite my CV optimized for ATS
-                        </label>
-                    </div>
-                </div>
-            </div>
-            <div class="d-grid gap-2">
-                <button type="submit" class="btn btn-primary btn-lg" id="analyzeButton">
-                    <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true" id="loadingSpinner"></span>
-                    Analyze
-                </button>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
+<!-- Alpine.js CDN -->
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.0/dist/cdn.min.js"></script>
 <script>
-document.querySelector('form').addEventListener('submit', function() {
-    const button = document.getElementById('analyzeButton');
-    const spinner = document.getElementById('loadingSpinner');
-
-    // Show spinner and disable button
-    spinner.classList.remove('d-none');
-    button.disabled = true;
-    button.childNodes[button.childNodes.length - 1].nodeValue = ' Analyzing...'; // Change button text
-
-    // Note: The form will submit naturally after this event handler completes.
-    // No need to preventDefault() unless doing AJAX submission.
-});
+    // Initialize character counts on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const cvTextarea = document.getElementById('cv');
+        const jdTextarea = document.getElementById('jd');
+        
+        // Dispatch input events to update the character counts
+        if (cvTextarea) {
+            cvTextarea.dispatchEvent(new Event('input'));
+        }
+        if (jdTextarea) {
+            jdTextarea.dispatchEvent(new Event('input'));
+        }
+    });
 </script>
 {% endblock %}

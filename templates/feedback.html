@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Provide Feedback{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <h1 class="mb-4">We Value Your Feedback</h1>
+        <p class="lead mb-4">Your feedback helps us improve the CV Analyzer. Please share your thoughts and suggestions with us.</p>
+        
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('feedback.submit_feedback') }}">
+                    {{ form.csrf_token }}
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">{{ form.email.label }}</label>
+                        {{ form.email(class="form-control", placeholder="your.email@example.com") }}
+                        {% if form.email.errors %}
+                            {% for error in form.email.errors %}
+                                <div class="form-text text-danger">{{ error }}</div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="form-text">We'll never share your email with anyone else.</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="rating" class="form-label">{{ form.rating.label }}</label>
+                        {{ form.rating(class="form-select") }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="feedback" class="form-label">{{ form.feedback.label }}</label>
+                        {{ form.feedback(class="form-control", rows="5", placeholder="What did you think about the CV Analyzer? How could we improve it?") }}
+                        {% if form.feedback.errors %}
+                            {% for error in form.feedback.errors %}
+                                <div class="form-text text-danger">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">Submit Feedback</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

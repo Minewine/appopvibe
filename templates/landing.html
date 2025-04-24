@@ -146,9 +146,9 @@
                 <h5 class="modal-title" id="feedbackModalLabel">Envoyez-nous vos commentaires</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form action="{{ url_for('submit_feedback') }}" method="POST">
-                <!-- Removed CSRF token protection due to session issues -->
-                <input type="hidden" name="csrf_token" value="static-csrf-token-for-debugging">
+            <form action="{{ url_for('feedback.submit_feedback') }}" method="POST">
+                <!-- Proper CSRF token protection -->
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="email" class="form-label">Votre e-mail</label>
@@ -172,7 +172,7 @@
     <div class="row">
         <div class="col-lg-8 mx-auto text-center">
             <div class="d-grid gap-3 d-sm-flex justify-content-sm-center">
-                <a href="{{ url_for('form') }}" class="btn btn-primary btn-lg px-4 py-3">
+                <a href="{{ url_for('main.submit_cv') }}" class="btn btn-primary btn-lg px-4 py-3">
                     <i class="bi bi-play-circle me-2"></i>Tester le système
                 </a>
                 <button type="button" class="btn btn-outline-secondary btn-lg px-4 py-3" data-bs-toggle="modal" data-bs-target="#feedbackModal">
