@@ -127,7 +127,7 @@ except Exception as e:
     # Log the error to a file for debugging with full traceback
     error_log_path = os.path.join(project_home, 'logs', 'import_error.log')
     try:
-        with open(error_log_path, 'a') as f:
+        with open(error_log_path, 'a', encoding='utf-8') as f:
             f.write(f"[{datetime.now()}] {error_message}\n")
             f.write(f"FULL TRACEBACK:\n{tb}\n")
             f.write(f"Python version: {sys.version}\n")
@@ -151,7 +151,7 @@ except Exception as e:
     except Exception as log_error:
         print(f"Failed to log error: {log_error}")
     
-    # Create simple HTML response with error details to make debugging easier
+    # Create simple HTML response with error details to make debugging easier - ASCII only
     error_html = f"""
     <!DOCTYPE html>
     <html>
@@ -167,7 +167,7 @@ except Exception as e:
     <body>
         <h1>AppOpVibe - Application Setup Issue</h1>
         <p>The application is running in diagnostic mode.</p>
-        <p class="error"><strong>Error:</strong> {error_message}</p>
+        <p class="error"><strong>Error:</strong> {str(error_message).encode('ascii', 'replace').decode('ascii')}</p>
         <h3>Diagnostic Information:</h3>
         <pre>Python: {sys.version}
 Working Dir: {os.getcwd()}

@@ -1,9 +1,10 @@
 """
 Minimal Flask application for testing Passenger deployment
+Uses only ASCII characters for maximum compatibility
 """
 from flask import Flask, render_template_string
 
-# Create minimal Flask app
+# Create minimal Flask app with ASCII only
 app = Flask(__name__)
 
 # Simple route that doesn't depend on any other modules
