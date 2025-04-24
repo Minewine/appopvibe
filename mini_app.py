@@ -21,7 +21,7 @@ def index():
     </head>
     <body>
         <h1>Minimal Flask Application</h1>
-        <p class="success">✓ Flask is working correctly!</p>
+        <p class="success">SUCCESS: Flask is working correctly!</p>
         <p>This is a minimal Flask application that doesn't depend on any project-specific modules.</p>
     </body>
     </html>
