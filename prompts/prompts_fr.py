@@ -3,65 +3,80 @@ French prompts for CV Analyzer
 """
 
 FULL_ANALYSIS_PROMPT_TEMPLATE_FR = """
-J'ai besoin que vous analysiez un CV par rapport à une description de poste.
+Vous êtes un recruteur technique senior. Analysez le CV suivant par rapport à la description de poste fournie.
 
-CV:
+CV :
 ```
 {cv}
 ```
 
-Description du poste:
+Description du poste :
 ```
 {jd}
 ```
 
-Veuillez fournir une analyse complète au format Markdown avec les sections distinctes suivantes :
+**Instructions :**
+Fournissez votre analyse en Markdown clair en utilisant la structure et les titres de section suivants. Soyez direct, concis et fournissez des conseils exploitables.
 
-### Score de Correspondance Global
-- Fournissez un score en pourcentage (0-100%) indiquant dans quelle mesure le CV correspond aux exigences de la description de poste. Justifiez brièvement le score.
+---
 
-### Analyse des Mots-clés
-- **Mots-clés Correspondants :** Listez les compétences clés, technologies ou qualifications de la description de poste trouvées dans le CV.
-- **Mots-clés Manquants :** Listez les mots-clés importants de la description de poste *non* trouvés dans le CV.
+## 1. Score de Correspondance Global
+- Donnez un score en pourcentage (0–100 %) indiquant dans quelle mesure le CV correspond aux exigences du poste, avec une justification brève (2–3 phrases).
 
-### Analyse des Écarts de Compétences
-- Identifiez les domaines de compétences ou d'expérience spécifiques mentionnés dans la description de poste où le candidat semble manquer d'expérience d'après le CV.
+## 2. Analyse des Mots-clés
+- **Mots-clés Correspondants :** Listez les compétences, technologies ou qualifications de la description de poste présentes dans le CV.
+- **Mots-clés Manquants :** Listez les mots-clés ou exigences importants de la description de poste absents du CV.
 
-### Suggestions par Section
-- **Résumé/Profil :** Fournissez des suggestions spécifiques pour améliorer la section résumé du CV pour ce poste.
-- **Expérience :** Suggérez des améliorations ou des façons de reformuler les points d'expérience pour mieux correspondre à la description du poste.
-- **Compétences :** Recommandez des ajouts ou des modifications à la section compétences.
-- **Formation/Autre :** Notez toute suggestion pertinente pour les autres sections du CV.
+## 3. Analyse des Écarts de Compétences
+- Identifiez les compétences, expériences ou qualifications requises par le poste mais absentes ou faibles dans le CV.
 
-### Points Forts
-- Résumez les principaux points forts du profil du candidat pour ce rôle spécifique.
+## 4. Suggestions par Section
+- **Résumé/Profil :** Suggérez des améliorations pour la section résumé/profil.
+- **Expérience :** Recommandez des reformulations ou ajouts pour mieux correspondre au poste.
+- **Compétences :** Conseillez sur les ajouts ou modifications à la section compétences.
+- **Formation/Autre :** Suggérez toute amélioration pertinente pour la formation ou d'autres sections.
 
-### Points Faibles/Axes d'Amélioration
-- Résumez les principaux points faibles ou les domaines où le CV pourrait être considérablement amélioré pour ce rôle, au-delà de l'ajout de mots-clés.
+## 5. Points Forts
+- Résumez les principaux atouts du candidat pour ce poste.
 
-Soyez direct, concis et fournissez des conseils exploitables sous chaque section.
+## 6. Points Faibles et Axes d'Amélioration
+- Résumez les principales faiblesses ou axes d'amélioration, au-delà des mots-clés manquants.
+
+---
+
+**Formatage :**
+- Utilisez des listes à puces si nécessaire.
+- Gardez chaque section concise et orientée action.
 """
 
 CV_REWRITE_PROMPT_TEMPLATE_FR = """
-J'ai besoin que vous réécriviez le CV suivant pour l'optimiser pour les ATS (systèmes de suivi des candidats) en fonction de cette description de poste.
+Vous êtes un recruteur technique senior et expert en optimisation de CV. Réécrivez le CV suivant pour maximiser sa correspondance avec la description de poste et améliorer ses chances de passer les systèmes de suivi des candidatures (ATS).
 
-CV:
+CV :
 ```
 {cv}
 ```
 
-Description du poste:
+Description du poste :
 ```
 {jd}
 ```
 
-Veuillez réécrire le CV au format Markdown pour:
-1. Incorporer les mots-clés pertinents de la description du poste.
-2. Mettre en évidence les compétences transférables et les expériences pertinentes.
-3. Utiliser des réalisations quantifiables lorsque c'est possible.
-4. Maintenir une structure propre et professionnelle avec des titres de section clairs.
-5. S'assurer que toutes les informations importantes du CV original sont préservées.
-6. Se concentrer sur la réussite des filtres ATS tout en restant honnête.
+**Instructions :**
+Réécrivez le CV en Markdown professionnel en suivant ces consignes :
 
-Formatez le CV en Markdown propre avec des titres appropriés pour chaque section.
+1. Intégrez les mots-clés et compétences pertinents de la description de poste dans tout le CV.
+2. Mettez en avant les compétences transférables et les expériences directement pertinentes.
+3. Utilisez des réalisations quantifiables et des exemples précis si possible.
+4. Organisez le CV avec des titres de section clairs : Résumé/Profil, Expérience, Compétences, Formation, Autre (si applicable).
+5. Préservez toutes les informations importantes du CV original, mais reformulez et réorganisez pour plus de clarté et d'impact.
+6. Assurez-vous que le CV est honnête, concis et adapté à la description de poste.
+7. Formatez le CV pour la compatibilité ATS (évitez les tableaux, images ou formatages inhabituels).
+
+---
+
+**Format de sortie :**
+- Utilisez le Markdown avec des titres de section clairs.
+- Utilisez des listes à puces pour les réalisations et compétences.
+- Gardez un ton direct et professionnel.
 """
