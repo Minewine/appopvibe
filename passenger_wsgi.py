@@ -45,19 +45,57 @@ def simple_app(environ, start_response):
 try:
     # Try to import the Flask app - add compatibility for Python 3.9.21
     print("Attempting to import Flask application...")
-    # Make sure all required packages are available
+    
+    # Check for critical packages
     try:
         import flask
         print(f"Flask version: {flask.__version__}")
-    except ImportError:
-        print("WARNING: Flask is not installed in this Python environment")
+    except ImportError as e:
+        print(f"ERROR: Flask not installed properly: {e}")
+        raise
+        
+    # Check for app.py file
+    app_path = os.path.join(project_home, 'app.py')
+    if not os.path.exists(app_path):
+        print(f"ERROR: app.py not found at {app_path}")
+        raise FileNotFoundError(f"app.py not found at {app_path}")
+    else:
+        print(f"Found app.py at {app_path}")
     
-    # Try to import the application
-    from app import app as application
-    print("Flask application successfully imported")
+    # Explicitly set PYTHONPATH to help with imports
+    print(f"Current sys.path: {sys.path}")
+    
+    # Try alternative import methods if needed
+    try:
+        # Try direct import
+        from app import app as application
+        print("Flask application successfully imported")
+    except ImportError as e:
+        print(f"Direct import failed: {e}")
+        # Try using relative import
+        print("Trying alternative import method...")
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("app", app_path)
+        app_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(app_module)
+        application = app_module.app
+        print("Flask application imported using importlib")
 except Exception as e:
     # If there's an error importing the app, use the simple app and log the error
-    print(f"Error importing Flask application: {e}")
+    error_message = f"Error importing Flask application: {e}"
+    print(error_message)
+    
+    # Log the error to a file for debugging
+    error_log_path = os.path.join(project_home, 'logs', 'import_error.log')
+    try:
+        with open(error_log_path, 'a') as f:
+            f.write(f"[{datetime.now()}] {error_message}\n")
+            f.write(f"Python version: {sys.version}\n")
+            f.write(f"Working directory: {os.getcwd()}\n")
+            f.write(f"sys.path: {sys.path}\n\n")
+    except Exception as log_error:
+        print(f"Failed to log error: {log_error}")
+    
     print("Using simple test application instead")
     application = simple_app
 
