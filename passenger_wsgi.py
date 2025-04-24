@@ -67,9 +67,44 @@ try:
     
     # Try alternative import methods if needed
     try:
+        # First try importing from the minimal app to verify Flask works
+        print("Trying to import from minimal app first...")
+        mini_app_path = os.path.join(project_home, 'mini_app.py')
+        if os.path.exists(mini_app_path):
+            print(f"Found minimal app at {mini_app_path}")
+            try:
+                from mini_app import app as application
+                print("Minimal Flask application successfully imported!")
+                # Skip trying to import the other apps since this one worked
+                imported_successfully = True
+                # Break out of the import chain
+                raise ImportError("Using minimal app instead")
+            except Exception as e:
+                print(f"Minimal app import failed: {e}")
+                imported_successfully = False
+        
+        # If minimal app failed, try the test app
+        if not imported_successfully:
+            print("Trying to import from test app...")
+            test_app_path = os.path.join(project_home, 'app_test.py')
+            if os.path.exists(test_app_path):
+                print(f"Found test app at {test_app_path}")
+                try:
+                    from app_test import app as application
+                    print("Test Flask application successfully imported!")
+                    # Skip trying to import the main app
+                    imported_successfully = True
+                    # Break out of the import chain
+                    raise ImportError("Using test app instead")
+                except Exception as e:
+                    print(f"Test app import failed: {e}")
+                    imported_successfully = False
+        
+        # If test import failed or file doesn't exist, try the real app
+        print("Trying to import from main app...")
         # Try direct import
         from app import app as application
-        print("Flask application successfully imported")
+        print("Main Flask application successfully imported")
     except ImportError as e:
         print(f"Direct import failed: {e}")
         # Try using relative import
@@ -85,19 +120,73 @@ except Exception as e:
     error_message = f"Error importing Flask application: {e}"
     print(error_message)
     
-    # Log the error to a file for debugging
+    # Get formatted traceback for more detailed error information
+    import traceback
+    tb = traceback.format_exc()
+    
+    # Log the error to a file for debugging with full traceback
     error_log_path = os.path.join(project_home, 'logs', 'import_error.log')
     try:
         with open(error_log_path, 'a') as f:
             f.write(f"[{datetime.now()}] {error_message}\n")
+            f.write(f"FULL TRACEBACK:\n{tb}\n")
             f.write(f"Python version: {sys.version}\n")
             f.write(f"Working directory: {os.getcwd()}\n")
-            f.write(f"sys.path: {sys.path}\n\n")
+            f.write(f"sys.path: {sys.path}\n")
+            
+            # Check for Python package versions that might be causing issues
+            try:
+                import flask
+                f.write(f"Flask version: {flask.__version__}\n")
+            except:
+                f.write("Flask not properly installed\n")
+                
+            try:
+                import werkzeug
+                f.write(f"Werkzeug version: {werkzeug.__version__}\n")
+            except:
+                f.write("Werkzeug not properly installed\n")
+            
+            f.write("\n\n")
     except Exception as log_error:
         print(f"Failed to log error: {log_error}")
     
-    print("Using simple test application instead")
-    application = simple_app
+    # Create simple HTML response with error details to make debugging easier
+    error_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>AppOpVibe - Setup Issue</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }}
+            pre {{ background: #f6f8fa; padding: 15px; border-radius: 5px; overflow: auto; }}
+            .error {{ color: #d63031; }}
+            .info {{ color: #0984e3; }}
+        </style>
+    </head>
+    <body>
+        <h1>AppOpVibe - Application Setup Issue</h1>
+        <p>The application is running in diagnostic mode.</p>
+        <p class="error"><strong>Error:</strong> {error_message}</p>
+        <h3>Diagnostic Information:</h3>
+        <pre>Python: {sys.version}
+Working Dir: {os.getcwd()}
+Timestamp: {datetime.now()}
+        </pre>
+        <p>Detailed error logs are available in: {error_log_path}</p>
+    </body>
+    </html>
+    """
+    
+    # Use a modified simple_app that returns HTML with error details
+    def diagnostic_app(environ, start_response):
+        status = '200 OK'
+        response_headers = [('Content-type', 'text/html')]
+        start_response(status, response_headers)
+        return [error_html.encode('utf-8')]
+    
+    print("Using diagnostic application instead")
+    application = diagnostic_app
 
 # Create a URL tracing WSGI middleware
 class URLTracingMiddleware:
