@@ -471,6 +471,13 @@ def form():
         logging.error(f"Error rendering form: {str(e)}", exc_info=True)
         return f"An error occurred while loading the form: {str(e)}", 500
 
+@app.route('/feedback/', methods=['GET'])
+@app.route('/feedback', methods=['GET'])
+def feedback_get():
+    """Handle GET requests to feedback URL by redirecting to home"""
+    logging.info("Redirecting GET request from /feedback to /")
+    return redirect(url_for('index'))
+
 @app.route('/feedback/', methods=['POST']) # Only allow POST requests
 @app.route('/feedback', methods=['POST'])  # Simplified route - only one route decorator
 # Rate limiting disabled for debugging

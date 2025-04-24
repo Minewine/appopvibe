@@ -28,3 +28,11 @@ RewriteRule ^(.*)$ /appopvibe/passenger_wsgi.py/$1 [QSA,L]
 
 # Fix the trailing slash issue 
 DirectorySlash On
+
+# Ensure POST requests are allowed (add this to your .htaccess)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Allow POST requests to pass through
+    RewriteCond %{REQUEST_METHOD} ^POST
+    RewriteRule ^(.*)$ - [L]
+</IfModule>
