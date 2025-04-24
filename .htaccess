@@ -13,6 +13,7 @@ SetEnv GROQ_API_KEY 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
 SetEnv REPORT_RETENTION_DAYS 30
 # SetEnv FLASK_DEBUG False # Removed - Should be false in production, handled elsewhere
 SetEnv SESSION_COOKIE_SECURE True
+SetEnv PYTHONIOENCODING utf-8
 </IfModule>
 # DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION END
 

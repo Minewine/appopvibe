@@ -25,7 +25,7 @@ load_dotenv(dotenv_path=dotenv_path, verbose=True, override=True)
 # Verify if key environment variables are loaded
 groq_key = os.getenv('GROQ_API_KEY')
 if groq_key:
-    print(f"✓ GROQ_API_KEY loaded successfully (length: {len(groq_key)})")
+    print(f"GROQ_API_KEY loaded successfully (length: {len(groq_key)})")
 else:
     print("✗ ERROR: Missing GROQ_API_KEY environment variable")
     print("Please set the GROQ_API_KEY in your .env file or environment variables")
