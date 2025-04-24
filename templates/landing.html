@@ -102,6 +102,42 @@
         </div>
     </div>
 
+    <!-- Next Steps Section -->
+    <div class="row mb-5">
+        <div class="col-lg-10 mx-auto">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-5">
+                    <h2 class="text-center mb-4">Prochaines étapes</h2>
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <div class="d-flex">
+                                <div class="flex-shrink-0">
+                                    <i class="bi bi-arrow-right-circle-fill text-primary fs-4 me-2"></i>
+                                </div>
+                                <div>
+                                    <h5>Historique de travail complet</h5>
+                                    <p>Nous aimerions compléter un historique de travail complet en utilisant quelque chose comme <a href="URL_PLACEHOLDER" target="_blank">ceci</a>.</p>
+                                    <p>Cet historique de travail complet remplacera le CV saisi.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="d-flex">
+                                <div class="flex-shrink-0">
+                                    <i class="bi bi-arrow-right-circle-fill text-primary fs-4 me-2"></i>
+                                </div>
+                                <div>
+                                    <h5>Générer un CV téléchargeable</h5>
+                                    <p>Utilisation de modèles de CV optimisés pour l'ATS.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Feedback Modal -->
 <div class="modal fade" id="feedbackModal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -111,14 +147,12 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="{{ url_for('submit_feedback') }}" method="POST">
-                <!-- CSRF token protection disabled due to session issues on the server -->
-                <!-- {{ feedback_form.csrf_token }} -->
-                <!-- Using hardcoded value as workaround -->
+                <!-- Removed CSRF token protection due to session issues -->
                 <input type="hidden" name="csrf_token" value="static-csrf-token-for-debugging">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="email" class="form-label">Votre e-mail</label>
-                        <input type="email" class="form-control" id="email" name="email" required>
+                        <input type="email" class="form-control" id="email" name="email">
                     </div>
                     <div class="mb-3">
                         <label for="comments" class="form-label">Commentaires</label>

@@ -472,48 +472,34 @@ def form():
         return f"An error occurred while loading the form: {str(e)}", 500
 
 @app.route('/feedback/', methods=['POST']) # Only allow POST requests
-@app.route('/feedback', methods=['POST'])  # Only allow POST requests
+@app.route('/feedback', methods=['POST'])  # Simplified route - only one route decorator
 # Rate limiting disabled for debugging
 def submit_feedback():
     """Process feedback submission (from modal) and save to a markdown file."""
-    logging.info(f"Entered submit_feedback() route for path: {request.path} (POST)") # Added log
+    logging.info(f"Entered submit_feedback() route for path: {request.path} (POST)")
+    
+    # Debug request information
+    logging.debug(f"Request method: {request.method}")
+    logging.debug(f"Request form data: {request.form}")
+    
     form = FeedbackForm()
 
-    # Removed GET request handling block entirely
-    # if request.method == 'GET':
-    #     return render_template('feedback.html', form=form)
+    # Process the form without validation temporarily for debugging
+    email = request.form.get('email', '')
+    comments = request.form.get('comments', '')
 
-    # For POST requests, process the form
-    if form.validate_on_submit():
-        email = form.email.data
-        comments = form.comments.data
+    logging.debug(f"Processing feedback submission from {email}")
 
-        logging.debug(f"Processing feedback submission from {email}")
-
-        success = save_feedback(email, comments)
-        if success:
-            # Set flash message and ensure it's stored in session
-            flash("Thank you for your feedback! We have received it.", "success")
-            # Force session to update to ensure flash message is saved
-            session.modified = True
-            logging.info("Feedback form validated and saved successfully")
-            return redirect(url_for('index', feedback_success='true'))
-        else:
-            flash("An error occurred while saving your feedback. Please try again later.", "danger")
-            session.modified = True
-            logging.error("Failed to save feedback")
-            return redirect(url_for('index'))
+    success = save_feedback(email, comments)
+    if success:
+        flash("Thank you for your feedback! We have received it.", "success")
+        session.modified = True
+        logging.info("Feedback form saved successfully")
+        return redirect(url_for('index', feedback_success='true'))
     else:
-        # Flash validation errors and redirect back to the index page
-        for field, errors in form.errors.items():
-             for error in errors:
-                  # Use a more specific field name if possible
-                  field_label = getattr(getattr(form, field, None), 'label', None)
-                  field_name = field_label.text if field_label else field.replace('_', ' ').title()
-                  flash(f"Feedback Error ({field_name}): {error}", "danger")
-                  session.modified = True # Ensure flash messages are saved
-        logging.warning(f"Feedback form validation failed: {form.errors}")
-        # Redirect back to index, the flashed messages will be displayed there
+        flash("An error occurred while saving your feedback. Please try again later.", "danger")
+        session.modified = True
+        logging.error("Failed to save feedback")
         return redirect(url_for('index'))
 
 @app.route('/submit', methods=['POST'])
