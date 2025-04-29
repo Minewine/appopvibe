@@ -27,7 +27,7 @@ groq_key = os.getenv('GROQ_API_KEY')
 if groq_key:
     print(f"GROQ_API_KEY loaded successfully (length: {len(groq_key)})")
 else:
-    print("✗ ERROR: Missing GROQ_API_KEY environment variable")
+    print("ERROR: Missing GROQ_API_KEY environment variable")
     print("Please set the GROQ_API_KEY in your .env file or environment variables")
     # Exit if running as a script
     if __name__ == '__main__':
