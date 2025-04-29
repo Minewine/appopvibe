@@ -67,58 +67,213 @@ async def analyze():
         
         # Define default templates since PROMPT_TEMPLATES is not in config
         DEFAULT_TEMPLATES = {
-            'en': {
-                'analysis': """Analyze the match between this CV and job description:
-                    CV: {cv}
-                    
-                    JOB DESCRIPTION: {jd}
-                    
-                    Provide a detailed analysis of how well the candidate's experience, 
-                    skills and qualifications match the job requirements. Include:
-                    1. Overall match score (as a percentage)
-                    2. Key strengths and matches
-                    3. Notable gaps and weaknesses
-                    4. Specific recommendations to improve the CV
-                """,
-                'rewrite': """Rewrite this CV to better match the job description:
-                    ORIGINAL CV: {cv}
-                    
-                    JOB DESCRIPTION: {jd}
-                    
-                    Create an optimized version of the CV that:
-                    1. Highlights relevant experience and skills
-                    2. Uses keywords from the job description
-                    3. Presents achievements with metrics where possible
-                    4. Is formatted for ATS compatibility
-                """
-            },
-            'fr': {
-                'analysis': """Analysez la correspondance entre ce CV et cette description de poste:
-                    CV: {cv}
-                    
-                    DESCRIPTION DU POSTE: {jd}
-                    
-                    Fournissez une analyse détaillée de l'adéquation entre l'expérience, 
-                    les compétences et les qualifications du candidat et les exigences du poste. Incluez:
-                    1. Score de correspondance global (en pourcentage)
-                    2. Points forts et correspondances clés
-                    3. Lacunes et faiblesses notables
-                    4. Recommandations spécifiques pour améliorer le CV
-                """,
-                'rewrite': """Réécrivez ce CV pour mieux correspondre à la description du poste:
-                    CV ORIGINAL: {cv}
-                    
-                    DESCRIPTION DU POSTE: {jd}
-                    
-                    Créez une version optimisée du CV qui:
-                    1. Met en évidence l'expérience et les compétences pertinentes
-                    2. Utilise des mots-clés de la description du poste
-                    3. Présente les réalisations avec des métriques si possible
-                    4. Est formaté pour la compatibilité ATS
-                """
-            }
+        'en': {
+            'analysis': """
+You are a senior technical recruiter. Analyze the following CV against the provided job description.
+
+CV:
+{cv}
+
+Job Description:
+{jd}
+
+**Instructions:**
+1. Your **SOLE TASK** is to perform the analysis and output it in the specified Markdown format.
+2. **ABSOLUTELY NO** conversational text, introductions, or explanations before or after the analysis output.
+3. **ABSOLUTELY NO** JSON, dictionary structures, code blocks, or any other wrapping around the analysis content.
+4. **ABSOLUTELY DO NOT** include the original CV or Job Description in the output.
+5. **ABSOLUTELY DO NOT** generate a rewritten version of the CV.
+6. Produce your analysis strictly using the Markdown structure provided in the "OUTPUT STRUCTURE" section below.
+
+---
+**OUTPUT STRUCTURE:**
+(Your output MUST begin EXACTLY with the first required Markdown heading: '## 1. Overall Match Score'. There should be NOTHING before it.)
+
+## 1. Overall Match Score
+- Give a percentage score (0–100%) for how well the CV matches the job requirements.
+- Briefly justify your score in 2–3 sentences.
+
+## 2. Keyword Analysis
+- **Matched Keywords:** List key skills, technologies, or qualifications *verbatim* from the job description that are clearly present in the CV.
+- **Missing Keywords:** List important keywords or requirements *verbatim* from the job description that are NOT found in the CV.
+
+## 3. Skill Gap Analysis
+- Identify specific skills, experiences, or qualifications required by the job but missing or weak in the CV, based on the job description, beyond just individual keywords.
+
+## 4. Section-by-Section Suggestions
+- Provide specific, actionable suggestions for improving *each* of the following CV sections to better match the job. Suggest how content could be rephrased or what type of relevant information should be added based on the job description requirements:
+    - **Summary/Profile:** Suggestions for this section.
+    - **Experience:** Recommendations for improving bullet points.
+    - **Skills:** Advice on additions or changes.
+    - **Education/Other:** Suggest any relevant improvements for education or other sections.
+
+## 5. Strengths
+- Summarize the main strengths of the candidate *specifically* for this role, based on the job description.
+
+## 6. Weaknesses & Improvement Areas
+- Summarize the main weaknesses or areas for improvement, based on the job description, going beyond just missing keywords.
+
+---
+**Formatting Guidelines within Sections:**
+- Use Markdown bullet points (`-`) where appropriate.
+- Keep language direct and professional.
+- Adhere strictly to the section headings and numbering provided above.
+""",
+            'rewrite': """
+You are a senior technical recruiter and expert in resume optimization. Rewrite the following CV to maximize its match with the provided job description and improve its chances of passing Applicant Tracking Systems (ATS).
+
+CV:
+{cv}
+
+Job Description:
+{jd}
+
+**Output Instructions:**
+1. Your *entire* output *must* be the rewritten CV in clear, professional Markdown format.
+2. **ABSOLUTELY DO NOT** include any introductory text, explanations, conversational filler, or surrounding formatting like JSON, code blocks, or dictionary structures.
+3. **ABSOLUTELY DO NOT** generate an analysis of the CV or job description. Your *sole task* is rewriting.
+4. Incorporate relevant keywords and skills from the job description throughout the CV where appropriate and truthful.
+5. Emphasize transferable skills and directly relevant experiences for the target role.
+6. Use quantifiable achievements and specific examples from the original CV or implied by experience where possible.
+7. Preserve all important and truthful information from the original CV, but rephrase and reorganize as needed for clarity, impact, and relevance to the job description.
+8. Structure the rewritten CV *strictly* using the following section headings *in this order*. Only include a section if there is relevant content from the original CV to place under it:
+    - Summary/Profile
+    - Experience
+    - Projects (if applicable, based on original CV)
+    - Skills
+    - Education
+    - Other (if applicable, based on original CV)
+9. Format the CV for ATS compatibility using standard Markdown: use clear headings (`##`), bullet points (`-`), and plain text. Avoid tables, images, or unusual formatting.
+10. Keep language direct and professional.
+
+---
+
+**Output Format Example (Your output should begin directly with the first section heading):**
+
+## Summary/Profile
+[Optimized summary here]
+
+## Experience
+[Optimized experience bullet points here]
+
+## Projects
+[Optimized project details here, if applicable and separate from experience]
+
+## Skills
+[Optimized skills list here]
+
+## Education
+[Optimized education details here]
+
+## Other
+[Any other relevant optimized information here, if applicable]
+"""
+        },
+        'fr': {
+            'analysis': """
+Vous êtes un recruteur technique senior. Analysez le CV suivant par rapport à la description de poste fournie.
+
+CV:
+{cv}
+
+DESCRIPTION DU POSTE:
+{jd}
+
+**Instructions:**
+1. Votre **SEULE TÂCHE** est d'effectuer l'analyse et de la produire au format Markdown spécifié.
+2. **ABSOLUMENT AUCUN** texte conversationnel, introduction ou explication avant ou après la sortie de l'analyse.
+3. **ABSOLUTEMENT AUCUNE** structure JSON, dictionnaire, blocs de code, ou tout autre enveloppement autour du contenu de l'analyse.
+4. **NE PAS ABSOLUMENT** inclure le CV original ou la description de poste dans la sortie.
+5. **NE PAS ABSOLUMENT** générer une version réécrite du CV.
+6. Produisez votre analyse en utilisant strictement la structure Markdown fournie dans la section "STRUCTURE DE SORTIE" ci-dessous.
+
+---
+**STRUCTURE DE SORTIE:**
+(Votre sortie DOIT commencer EXACTEMENT par le premier titre Markdown requis : '## 1. Score de correspondance global'. Il ne doit y avoir RIEN avant.)
+
+## 1. Score de correspondance global
+- Donnez un score en pourcentage (0–100%) pour l'adéquation du CV avec les exigences du poste.
+- Justifiez brièvement votre score en 2 à 3 phrases.
+
+## 2. Analyse des mots-clés
+- **Mots-clés correspondants :** Listez les compétences clés, technologies ou qualifications *telles qu'elles apparaissent textuellement* dans la description de poste et qui sont clairement présentes dans le CV.
+- **Mots-clés manquants :** Listez les mots-clés ou exigences importants *tels qu'ils apparaissent textuellement* dans la description de poste et qui ne sont PAS trouvés dans le CV.
+
+## 3. Analyse des écarts de compétences
+- Identifiez les compétences, expériences ou qualifications spécifiques requises par le poste mais manquantes ou faibles dans le CV, sur la base de la description de poste, au-delà des simples mots-clés individuels.
+
+## 4. Suggestions section par section
+- Fournissez des suggestions spécifiques et exploitables pour améliorer *chacune* des sections suivantes du CV afin de mieux correspondre au poste. Suggérez comment le contenu pourrait être reformulé ou quel type d'informations pertinentes devrait être ajouté en fonction des exigences de la description de poste :
+    - **Résumé/Profil :** Suggestions pour cette section.
+    - **Expérience :** Recommandations pour améliorer les points de liste d'expérience.
+    - **Compétences :** Conseils sur les ajouts ou les modifications.
+    - **Formation/Autre :** Suggérez toute amélioration pertinente pour la formation ou d'autres sections.
+
+## 5. Points forts
+- Résumez les principaux points forts du candidat *spécifiquement* pour ce rôle, sur la base de la description de poste.
+
+## 6. Faiblesses et domaines d'amélioration
+- Résumez les principales faiblesses ou domaines d'amélioration, sur la base de la description de poste, allant au-delà des simples mots-clés manquants.
+
+---
+**Directives de formatage dans les sections :**
+- Utilisez des points de liste Markdown (`-`) le cas échéant.
+- Gardez un langage direct et professionnel.
+- Adhérez strictement aux titres de section et à la numérotation fournis ci-dessus.
+""",
+            'rewrite': """
+Vous êtes un recruteur technique senior et un expert en optimisation de CV. Réécrivez le CV suivant pour maximiser sa correspondance avec la description de poste fournie et améliorer ses chances de passer les systèmes de suivi des candidatures (ATS).
+
+CV:
+{cv}
+
+DESCRIPTION DU POSTE:
+{jd}
+
+**Instructions de sortie :**
+1. Votre *sortie entière* DOIT être le CV réécrit au format Markdown clair et professionnel.
+2. **ABSOLUMENT AUCUN** texte d'introduction, explication, remplissage conversationnel, ou formatage environnant comme JSON, blocs de code, ou structures de dictionnaire.
+3. **NE PAS ABSOLUMENT** générer une analyse du CV ou de la description de poste. Votre *seule tâche* est la réécriture.
+4. Intégrez les mots-clés et compétences pertinents de la description de poste tout au long du CV là où c'est approprié et véridique.
+5. Mettez l'accent sur les compétences transférables et les expériences directement pertinentes pour le rôle ciblé.
+6. Utilisez des réalisations quantifiables et des exemples spécifiques du CV original ou implicites par l'expérience si possible.
+7. Conservez toutes les informations importantes et véridiques du CV original, mais reformulez et réorganisez-les si nécessaire pour plus de clarté, d'impact et de pertinence par rapport à la description de poste.
+8. Structurez le CV réécrit *strictement* en utilisant les titres de section suivants *dans cet ordre*. N'incluez une section que si le CV original contient du contenu pertinent à y placer :
+    - Résumé/Profil
+    - Expérience
+    - Projets (si applicable, basé sur le CV original)
+    - Compétences
+    - Formation
+    - Autre (si applicable, basé sur le CV original)
+9. Formatez le CV pour la compatibilité ATS en utilisant Markdown standard : utilisez des titres clairs (`##`), des points de liste (`-`), et du texte brut. Évitez les tableaux, les images ou les formats inhabituels.
+10. Gardez un langage direct et professionnel.
+
+---
+
+**Exemple de format de sortie (Votre sortie doit commencer directement par le premier titre de section) :**
+
+## Résumé/Profil
+[Résumé optimisé ici]
+
+## Expérience
+[Points de liste d'expérience optimisés ici]
+
+## Projets
+[Détails de projets optimisés ici, si applicable et séparé de l'expérience]
+
+## Compétences
+[Liste de compétences optimisée ici]
+
+## Formation
+[Détails de formation optimisés ici]
+
+## Autre
+[Toute autre information pertinente optimisée ici, si applicable]
+"""
         }
-        
+    }
+
+
         # Set up directories
         reports_dir = current_app.config.get('REPORTS_FOLDER', os.path.join(os.getcwd(), 'reports'))
         os.makedirs(reports_dir, exist_ok=True)
@@ -147,23 +302,18 @@ async def analyze():
         result = await analyzer_service.process_submission(
             cv_text, jd_text, language, rewrite_cv
         )
-        
-        # Handle both cases: when result is a tuple or a single value
-        if isinstance(result, tuple) and len(result) == 2:
-            analysis_result, rewrite_result = result
-        else:
-            # If only one result is returned, assume it's the analysis
-            analysis_result = result
-            rewrite_result = None
-            logger.warning("process_submission returned only one value instead of two")
-        
+
+        # Correctly extract analysis and rewrite results from the dictionary
+        analysis_result = result.get('analysis', '') # Get the analysis string
+        rewrite_result = result.get('rewritten_cv') # Get the rewritten_cv string (can be None)
+
         # Save results to a report file
         report_filename = report_service.save_report(
-            cv_text, jd_text, analysis_result, 
-            rewrite_result if rewrite_cv else None,
+            cv_text, jd_text, analysis_result, # Pass the analysis string
+            rewrite_result, # Pass the rewrite string (or None)
             language
         )
-        
+
         # Save report ID in session for security
         session['current_report_id'] = report_filename
         
