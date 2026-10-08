@@ -2,6 +2,7 @@
 LLM service for handling interactions with language models.
 Supports multiple providers (Groq, OpenRouter, etc.) through a flexible provider system.
 """
+import asyncio
 import os
 import logging
 import httpx
@@ -82,20 +83,26 @@ class LLMService:
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    self.api_url,
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json=payload,
-                )
-                response.raise_for_status()
-                result = response.json()
-                if "choices" in result and result["choices"]:
-                    return result["choices"][0]["message"]["content"]
-                self.logger.warning("Unexpected API response format")
-                return "Error: Unexpected response from LLM API"
+                for attempt in range(3):
+                    response = await client.post(
+                        self.api_url,
+                        headers={
+                            "Authorization": f"Bearer {self.api_key}",
+                            "Content-Type": "application/json"
+                        },
+                        json=payload,
+                    )
+                    if response.status_code == 429 and attempt < 2:
+                        self.logger.warning("Rate limited, waiting before retry %s", attempt + 1)
+                        await asyncio.sleep(12)
+                        continue
+                    response.raise_for_status()
+                    result = response.json()
+                    if "choices" in result and result["choices"]:
+                        return result["choices"][0]["message"]["content"]
+                    self.logger.warning("Unexpected API response format")
+                    return "Error: Unexpected response from LLM API"
+                return "Error: LLM API request failed with status 429"
         except httpx.TimeoutException:
             self.logger.error("Timeout when calling LLM API with model %s", model)
             return "Error: The request to the LLM service timed out."

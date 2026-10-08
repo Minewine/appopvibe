@@ -38,7 +38,7 @@ class AnalyzerService:
             prompt=self.prompt_templates["analysis"].format(cv=cv_text, jd=jd_text),
             system=self.prompt_templates["system"],
             temperature=0.2,
-            max_tokens=2500,
+            max_tokens=1400,
             json_mode=True,
         )
         if raw.startswith("Error:"):
@@ -54,7 +54,7 @@ class AnalyzerService:
             prompt=self.prompt_templates["rewrite"].format(cv=cv_text, jd=jd_text),
             system=self.prompt_templates["rewrite_system"],
             temperature=0.3,
-            max_tokens=3500,
+            max_tokens=1200,
             json_mode=True,
         )
         if raw.startswith("Error:"):
@@ -70,7 +70,7 @@ class AnalyzerService:
             prompt=self.prompt_templates["letter"].format(cv=cv_text, jd=jd_text),
             system=self.prompt_templates["letter_system"],
             temperature=0.4,
-            max_tokens=1800,
+            max_tokens=1200,
             json_mode=True,
         )
         if raw.startswith("Error:"):
@@ -86,13 +86,11 @@ class AnalyzerService:
     ) -> Dict[str, str]:
         self.logger.info("Processing submission (rewrite=%s, letter=%s)", rewrite, cover_letter)
         import asyncio
-        tasks = [self.analyze_cv_jd(cv_text, jd_text, language)]
-        keys = ["analysis"]
+        result = {"analysis": await self.analyze_cv_jd(cv_text, jd_text, language)}
         if rewrite:
-            tasks.append(self.rewrite_cv(cv_text, jd_text, language))
-            keys.append("rewritten_cv")
+            await asyncio.sleep(2)
+            result["rewritten_cv"] = await self.rewrite_cv(cv_text, jd_text, language)
         if cover_letter:
-            tasks.append(self.draft_letter(cv_text, jd_text, language))
-            keys.append("cover_letter")
-        results = await asyncio.gather(*tasks)
-        return dict(zip(keys, results))
+            await asyncio.sleep(2)
+            result["cover_letter"] = await self.draft_letter(cv_text, jd_text, language)
+        return result
