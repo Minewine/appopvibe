@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 
 import markdown2
+from appopvibe.services.report.swiss_cv import cv_text_from_blob
 
 
 class ReportService:
@@ -86,6 +87,7 @@ class ReportService:
         markdown_content = self.get_report(report_id)
         if not markdown_content:
             return None
+        markdown_content = self._readable(markdown_content)
         try:
             return markdown2.markdown(
                 markdown_content,
@@ -130,3 +132,28 @@ class ReportService:
         except Exception as e:
             self.logger.error("Error during report cleanup: %s", e)
             return 0
+
+    def _readable(self, markdown_content: str) -> str:
+        """Turn a raw model JSON block into readable markdown."""
+        def replace(match):
+            blob = match.group(1).strip()
+            if '"cvmarkdown"' in blob or '"cv_markdown"' in blob:
+                return cv_text_from_blob(blob)
+            score = re.search(r'"score"\s*:\s*(\d+)', blob)
+            line = re.search(r'"oneline"\s*:\s*"((?:\\.|[^"\\])*)"', blob)
+            if not score and not line:
+                return match.group(0)
+            parts = ["### Score", "", f"**{score.group(1)}/100**" if score else ""]
+            if line:
+                try:
+                    parts += ["", json.loads('"' + line.group(1) + '"')]
+                except json.JSONDecodeError:
+                    parts += ["", line.group(1)]
+            return "\n".join(parts)
+        return re.sub(
+            r"(## (?:Analysis Summary|Rewritten CV Optimized for ATS|CV réécrit, optimisé ATS)\n+)(\{.*)",
+            lambda m: m.group(1) + replace(type("M", (), {"group": lambda self, i: m.group(2) if i == 1 else ""})()),
+            markdown_content,
+            count=2,
+            flags=re.S,
+        )

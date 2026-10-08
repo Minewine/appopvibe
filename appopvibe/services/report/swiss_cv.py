@@ -1,5 +1,6 @@
 """Build a one-page Swiss-style CV as a Word document."""
 import io
+import json
 import re
 from typing import List, Tuple
 
@@ -52,6 +53,20 @@ SECTION_MAP = {
 }
 
 
+
+def cv_text_from_blob(blob: str) -> str:
+    """Pull rewritten CV markdown out of a raw model JSON reply."""
+    match = re.search(r'"cvmarkdown"\s*:\s*"((?:\\.|[^"\\])*)"', blob, re.I)
+    if not match:
+        match = re.search(r'"cv_markdown"\s*:\s*"((?:\\.|[^"\\])*)"', blob, re.I)
+    if not match:
+        return blob
+    try:
+        return json.loads('"' + match.group(1) + '"')
+    except json.JSONDecodeError:
+        return match.group(1).replace("\\n", "\n").replace("\\t", "\t")
+
+
 def extract_rewritten_cv(report_markdown: str) -> Tuple[str, str]:
     """Return (cv_markdown, language code) from a saved report."""
     cv, language, _source = extract_cv_for_docx(report_markdown)
@@ -74,7 +89,7 @@ def extract_cv_for_docx(report_markdown: str) -> Tuple[str, str, str]:
             flags=re.S,
         ).strip()
         if cv and not cv.lower().startswith("error:"):
-            return cv, language, "rewritten"
+            return cv_text_from_blob(cv), language, "rewritten"
     original = re.search(r"## Original CV\n+```\n(.*?)\n```", report_markdown, re.S)
     if original and original.group(1).strip():
         return original.group(1).strip(), language, "original"
@@ -82,10 +97,17 @@ def extract_cv_for_docx(report_markdown: str) -> Tuple[str, str, str]:
 
 
 def _set_run_font(run, name="Calibri", size=11, bold=False, color=None, italic=False):
+    from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
     from docx.shared import Pt
     run.font.name = name
-    run._element.rPr.rFonts.set(qn("w:eastAsia"), name)
+    rpr = run._element.get_or_add_rPr()
+    fonts = rpr.find(qn("w:rFonts"))
+    if fonts is None:
+        fonts = OxmlElement("w:rFonts")
+        rpr.append(fonts)
+    fonts.set(qn("w:ascii"), name)
+    fonts.set(qn("w:hAnsi"), name)
     run.font.size = Pt(size)
     run.bold = bold
     run.italic = italic
