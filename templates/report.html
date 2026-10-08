@@ -75,9 +75,14 @@
                 <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
                     <i class="bi bi-arrow-left"></i> New Analysis
                 </a>
-                <a href="{{ url_for('report.download_report', report_id=request.view_args.get('report_id')) }}" class="btn btn-primary">
-                    <i class="bi bi-download"></i> Download Report
-                </a>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('report.download_docx', report_id=report_id) }}" class="btn btn-primary">
+                        Download CV (.docx)
+                    </a>
+                    <a href="{{ url_for('report.download_report', report_id=report_id) }}" class="btn btn-outline-secondary">
+                        Download report
+                    </a>
+                </div>
             </div>
         </div>
     </div>
