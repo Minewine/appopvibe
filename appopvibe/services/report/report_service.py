@@ -62,19 +62,6 @@ class ReportService:
 {cover_letter}
 
 """
-        report_content += f"""
-## Original CV
-
-```
-{cv_text}
-```
-
-## Original Job Description
-
-```
-{jd_text}
-```
-"""
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(report_content)
