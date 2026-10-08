@@ -51,7 +51,7 @@ def download_docx(report_id):
         abort(404)
     cv_markdown, language, source = extract_cv_for_docx(markdown)
     if not cv_markdown:
-        cv_markdown = markdown
+        cv_markdown = "Tick Rewrite my CV optimized for ATS and run the form again. This report has a score only, so there is no CV to export."
         source = "report"
     try:
         payload = build_swiss_cv(cv_markdown, language)
