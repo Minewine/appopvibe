@@ -5,7 +5,7 @@ import re
 from io import BytesIO
 
 from flask import (
-    Blueprint, render_template, send_file,
+    Blueprint, render_template, send_file, Response,
     current_app, abort
 )
 from appopvibe.services import ReportService
@@ -31,10 +31,14 @@ def download_report(report_id):
     """Download the saved report markdown."""
     report_id = _checked_id(report_id)
     report_service = _service()
-    path = report_service._path_for(report_id)
-    if not path.is_file():
+    text = report_service.get_report(report_id)
+    if not text:
         abort(404)
-    return send_file(path, as_attachment=True, download_name=f"cv_analysis_{report_id}.md")
+    return Response(
+        text,
+        mimetype="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename=cv_analysis_{report_id}.md"},
+    )
 
 
 @report_bp.route("/download-docx/<report_id>")
@@ -55,13 +59,10 @@ def download_docx(report_id):
         current_app.logger.exception("DOCX build failed")
         payload = _plain_docx(cv_markdown)
     name = "cv_rewritten" if source == "rewritten" else "cv"
-    buffer = BytesIO(payload)
-    buffer.seek(0)
-    return send_file(
-        buffer,
-        as_attachment=True,
-        download_name=f"{name}_{language}_{report_id}.docx",
+    return Response(
+        payload,
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f"attachment; filename={name}_{language}_{report_id}.docx"},
     )
 
 

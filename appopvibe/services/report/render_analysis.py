@@ -46,8 +46,9 @@ def render_analysis(data: dict, language: str = "en") -> str:
         status = t["status"].get(item.get("status"), item.get("status", ""))
         lines.append(f"- **{status}:** {item.get('requirement', '')} — {item.get('evidence', '')}")
     kw = data.get("keywords") or {}
-    lines += ["", f"## 3. {t['keywords']}", ""]
-    lines.append("- Exact: " + ", ".join(kw.get("exact_matches") or ["—"]))
+    if any(kw.get(key) for key in ("exact_matches", "synonyms_already_in_cv", "missing_exact_terms", "do_not_add")):
+        lines += ["", f"## 3. {t['keywords']}", ""]
+        lines.append("- Exact: " + ", ".join(kw.get("exact_matches") or ["—"]))
     syn = [
         f"{s.get('cv_term')} → {s.get('jd_term')}"
         for s in (kw.get("synonyms_already_in_cv") or [])
@@ -56,20 +57,29 @@ def render_analysis(data: dict, language: str = "en") -> str:
     lines.append("- Already said another way: " + ", ".join(syn or ["—"]))
     lines.append("- Missing exact terms: " + ", ".join(kw.get("missing_exact_terms") or ["—"]))
     lines.append("- Do not add: " + ", ".join(kw.get("do_not_add") or ["—"]))
-    lines += ["", f"## 4. {t['strengths']}", ""]
-    for item in data.get("strengths") or []:
-        lines.append(f"- {item.get('point', '')} ({item.get('evidence', '')})")
-    lines += ["", f"## 5. {t['risks']}", ""]
-    for item in data.get("risks") or []:
-        lines.append(f"- {item.get('point', '')} — {item.get('how_to_handle', '')}")
-    lines += ["", f"## 6. {t['edits']}", ""]
-    for item in data.get("edits") or []:
-        lines.append(f"- **{item.get('section', '')}:** {item.get('rewrite', '')}")
-        lines.append(f"  - Why: {item.get('why', '')}")
-    lines += ["", f"## 7. {t['interview']}", ""]
-    for q in data.get("interview_prompts") or []:
-        lines.append(f"- {q}")
-    lines += ["", f"## 8. {t['honesty']}", "", str(data.get("honesty_check", "")), ""]
+    strengths = data.get("strengths") or []
+    if strengths:
+        lines += ["", f"## 4. {t['strengths']}", ""]
+        for item in strengths:
+            lines.append(f"- {item.get('point', '')} ({item.get('evidence', '')})")
+    risks = data.get("risks") or []
+    if risks:
+        lines += ["", f"## 5. {t['risks']}", ""]
+        for item in risks:
+            lines.append(f"- {item.get('point', '')} — {item.get('how_to_handle', '')}")
+    edits = data.get("edits") or []
+    if edits:
+        lines += ["", f"## 6. {t['edits']}", ""]
+        for item in edits:
+            lines.append(f"- **{item.get('section', '')}:** {item.get('rewrite', '')}")
+            lines.append(f"  - Why: {item.get('why', '')}")
+    questions = data.get("interview_prompts") or []
+    if questions:
+        lines += ["", f"## 7. {t['interview']}", ""]
+        for q in questions:
+            lines.append(f"- {q}")
+    if data.get("honesty_check"):
+        lines += ["", f"## 8. {t['honesty']}", "", str(data.get("honesty_check")), ""]
     return "\n".join(lines)
 
 

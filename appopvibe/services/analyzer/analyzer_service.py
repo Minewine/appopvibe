@@ -42,7 +42,7 @@ class AnalyzerService:
             prompt=self.prompt_templates["analysis"].format(cv=cv_text, jd=jd_text),
             system=self.prompt_templates["system"],
             temperature=0.2,
-            max_tokens=1400,
+            max_tokens=2200,
             json_mode=True,
         )
         if raw.startswith("Error:"):
@@ -62,7 +62,7 @@ class AnalyzerService:
             prompt=self.prompt_templates["rewrite"].format(cv=cv_text, jd=jd_text),
             system=self.prompt_templates["rewrite_system"],
             temperature=0.3,
-            max_tokens=1200,
+            max_tokens=2200,
             json_mode=True,
         )
         if raw.startswith("Error:"):
