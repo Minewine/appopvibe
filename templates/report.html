@@ -5,27 +5,46 @@
 {% block head %}
 <style>
     .report-container {
-        background-color: #fff;
+        background-color: #1c1b19;
+        color: #f4f1ea;
+        border: 1px solid #3a3834;
         border-radius: 8px;
-        box-shadow: 0 0 10px rgba(0,0,0,0.1);
         padding: 30px;
     }
-    .matching-score {
-        font-size: 2.5rem;
-        font-weight: bold;
+    .report-container h1,
+    .report-container h2,
+    .report-container h3,
+    .report-container p,
+    .report-container li,
+    .report-container td,
+    .report-container th {
+        color: #f4f1ea;
     }
-    .matching-label {
-        font-size: 1.1rem;
-        color: #6c757d;
+    .report-container a { color: #e7c27a; }
+    .report-container table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0 1.5rem;
     }
-    .recommendation-item {
-        margin-bottom: 15px;
-        padding-bottom: 15px;
-        border-bottom: 1px solid #e9ecef;
+    .report-container th,
+    .report-container td {
+        border: 1px solid #3a3834;
+        padding: 0.6rem 0.75rem;
+        vertical-align: top;
     }
-    .recommendation-item:last-child {
-        border-bottom: none;
+    .report-container th { background: #2a2825; }
+    .report-container pre,
+    .report-container code {
+        background: #141311;
+        color: #f4f1ea;
+        border-radius: 4px;
     }
+    .report-container pre {
+        padding: 1rem;
+        overflow-x: auto;
+        white-space: pre-wrap;
+    }
+    .report-container hr { border-color: #3a3834; }
 </style>
 {% endblock %}
 
@@ -34,7 +53,7 @@
     <div class="col-12">
         <nav aria-label="breadcrumb" class="mb-4">
             <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Home</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('main.submit_cv') }}">Home</a></li>
                 <li class="breadcrumb-item active">Analysis Results</li>
             </ol>
         </nav>
