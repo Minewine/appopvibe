@@ -42,12 +42,14 @@ class AnalyzerService:
             json_mode=True,
         )
         if raw.startswith("Error:"):
-            return {"error": raw}
+            return {"error": raw, "raw": raw}
         try:
-            return self._parse_json(raw)
+            data = self._parse_json(raw)
         except (json.JSONDecodeError, ValueError) as exc:
             self.logger.warning("JSON failed: %s", exc)
-            return {"error": raw}
+            return {"error": raw, "raw": raw}
+        data["raw"] = raw
+        return data
 
     def _score_from_rubric(self, data: Dict[str, Any]) -> None:
         rows = [row for row in data.get("rubric") or [] if isinstance(row, dict)]
@@ -71,8 +73,10 @@ class AnalyzerService:
             self.prompt_templates["system"],
             900,
         )
-        if score.get("error"):
-            return score["error"]
+        if score.get("error") or not (score.get("score") or score.get("rubric") or score.get("one_line") or score.get("oneline")):
+            return score.get("raw") or score.get("error") or "The model did not return a score."
+        if not score.get("one_line"):
+            score["one_line"] = score.get("oneline") or score.get("oneLine") or ""
         self._score_from_rubric(score)
         details = await self._ask(
             "Using the same CV and job description, return JSON with must_haves, keywords, "
