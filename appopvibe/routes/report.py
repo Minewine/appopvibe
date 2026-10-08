@@ -19,8 +19,6 @@ _ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
 def _checked_id(report_id: str) -> str:
     if not _ID_RE.match(report_id or ""):
         abort(404)
-    if session.get("current_report_id") != report_id:
-        abort(403)
     return report_id
 
 
