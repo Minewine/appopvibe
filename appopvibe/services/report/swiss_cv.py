@@ -4,9 +4,7 @@ import re
 from typing import List, Tuple
 
 
-NAVY = RGBColor(0x1F, 0x3A, 0x5F)
 RULE = "1F3A5F"
-MUTED = RGBColor(0x55, 0x55, 0x55)
 
 HEADINGS = {
     "en": {
@@ -110,7 +108,7 @@ def _heading(doc, text):
     p.paragraph_format.space_before = Pt(12)
     p.paragraph_format.space_after = Pt(4)
     run = p.add_run(text.upper())
-    _set_run_font(run, size=11, bold=True, color=NAVY)
+    _set_run_font(run, size=11, bold=True, color=navy)
     _add_bottom_border(p)
     return p
 
@@ -156,6 +154,8 @@ def build_swiss_cv(cv_markdown: str, language: str = "en") -> bytes:
         raise RuntimeError(
             "Word export is not installed in this app. Run the appopvibe pip install python-docx, then restart."
         ) from exc
+    navy = RGBColor(0x1F, 0x3A, 0x5F)
+    muted = RGBColor(0x55, 0x55, 0x55)
     labels = HEADINGS.get(language, HEADINGS["en"])
     name, contact, sections = _parse_sections(cv_markdown)
     doc = Document()
@@ -175,14 +175,14 @@ def build_swiss_cv(cv_markdown: str, language: str = "en") -> bytes:
     name_p = doc.add_paragraph()
     name_p.paragraph_format.space_after = Pt(0)
     name_run = name_p.add_run(name)
-    _set_run_font(name_run, name="Calibri", size=22, bold=True, color=NAVY)
+    _set_run_font(name_run, name="Calibri", size=22, bold=True, color=navy)
 
     if contact:
         contact_p = doc.add_paragraph()
         contact_p.paragraph_format.space_before = Pt(2)
         contact_p.paragraph_format.space_after = Pt(2)
         contact_run = contact_p.add_run("  ·  ".join(contact[:4]))
-        _set_run_font(contact_run, size=10, color=MUTED)
+        _set_run_font(contact_run, size=10, color=muted)
 
     order = ["summary", "experience", "projects", "education", "skills", "languages", "other"]
     grouped = {key: items for key, items in sections}
@@ -211,7 +211,7 @@ def build_swiss_cv(cv_markdown: str, language: str = "en") -> bytes:
     footer = section.footer.paragraphs[0]
     footer.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     footer_run = footer.add_run(f"{labels['footer']}  ·  {name}")
-    _set_run_font(footer_run, size=8, color=MUTED)
+    _set_run_font(footer_run, size=8, color=muted)
 
     buffer = io.BytesIO()
     doc.save(buffer)
