@@ -46,7 +46,7 @@ class ReportService:
 {analysis_result}
 
 """
-        if rewritten_cv:
+        if rewritten_cv and not rewritten_cv.lower().startswith("error:"):
             title = "Rewritten CV Optimized for ATS" if language != "fr" else "CV réécrit, optimisé ATS"
             report_content += f"""
 ## {title}
@@ -54,7 +54,7 @@ class ReportService:
 {rewritten_cv}
 
 """
-        if cover_letter:
+        if cover_letter and not cover_letter.lower().startswith("error:"):
             title = "Draft cover letter" if language != "fr" else "Brouillon de lettre de motivation"
             report_content += f"""
 ## {title}

@@ -73,7 +73,7 @@ def extract_cv_for_docx(report_markdown: str) -> Tuple[str, str, str]:
             rewritten.group(1),
             flags=re.S,
         ).strip()
-        if cv:
+        if cv and not cv.lower().startswith("error:"):
             return cv, language, "rewritten"
     original = re.search(r"## Original CV\n+```\n(.*?)\n```", report_markdown, re.S)
     if original and original.group(1).strip():

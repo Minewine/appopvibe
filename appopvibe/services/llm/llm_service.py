@@ -75,9 +75,9 @@ class LLMService:
             "model": model,
             "messages": messages,
             "temperature": temperature,
-            "max_tokens": max_tokens,
+            "max_completion_tokens": max_tokens,
         }
-        if json_mode:
+        if json_mode and "gpt-oss" not in model:
             payload["response_format"] = {"type": "json_object"}
 
         try:
@@ -101,7 +101,8 @@ class LLMService:
             return "Error: The request to the LLM service timed out."
         except httpx.HTTPStatusError as e:
             self.logger.error("HTTP error when calling LLM API: %s", e)
-            return f"Error: LLM API request failed with status {e.response.status_code}"
+            detail = (e.response.text or "")[:300]
+            return f"Error: LLM API request failed with status {e.response.status_code}: {detail}"
         except Exception as e:
             self.logger.exception("Exception when calling LLM API: %s", e)
             return "Error: An unexpected error occurred when communicating with the LLM service."
