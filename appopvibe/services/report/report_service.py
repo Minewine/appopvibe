@@ -137,36 +137,29 @@ class ReportService:
             return 0
 
     def _readable(self, markdown_content: str) -> str:
-        """Turn a raw model JSON block into readable markdown."""
+        """Add a visible score without deleting the saved report."""
         score = re.search(r'"score"\s*:\s*(\d+)', markdown_content)
         advice = re.search(r'"recommendation"\s*:\s*"([^"]*)"', markdown_content)
         line = re.search(r'"oneline"\s*:\s*"([^"]*)"', markdown_content)
-        if score or line:
-            summary = ["### Score", ""]
-            if score:
-                summary.append(f"**{score.group(1)}/100**")
-            if advice:
-                summary += ["", advice.group(1)]
-            if line:
-                summary += ["", line.group(1)]
-            start = markdown_content.find("## Analysis Summary")
-            nxt = markdown_content.find("\n## ", start + 5)
-            if start != -1:
-                end = nxt if nxt != -1 else len(markdown_content)
-                markdown_content = (
-                    markdown_content[:start]
-                    + "## Analysis Summary\n\n"
-                    + "\n".join(summary)
-                    + "\n\n"
-                    + markdown_content[end:]
-                )
+        banner = []
+        if score:
+            banner.append(f"**Score: {score.group(1)}/100**")
+        if advice:
+            banner.append(advice.group(1))
+        if line:
+            banner.append(line.group(1))
+        if banner:
+            markdown_content = markdown_content.replace(
+                "## Analysis Summary",
+                "## Analysis Summary\n\n" + "\n\n".join(banner) + "\n",
+                1,
+            )
         if "cvmarkdown" in markdown_content.lower():
             cv = cv_text_from_blob(markdown_content)
-            markdown_content = re.sub(
-                r"## (?:Rewritten CV Optimized for ATS|CV réécrit, optimisé ATS)\s*\{.*",
-                "## Rewritten CV\n\n" + cv + "\n",
-                markdown_content,
-                count=1,
-                flags=re.S,
-            )
+            if cv and not cv.lstrip().startswith("{"):
+                markdown_content = markdown_content.replace(
+                    "## Rewritten CV Optimized for ATS",
+                    "## Rewritten CV Optimized for ATS\n\n" + cv + "\n",
+                    1,
+                )
         return markdown_content
