@@ -114,7 +114,7 @@ def analyze():
 
     except Exception as e:
         logger.exception("Error processing submission: %s", e)
-        flash("An error occurred while analyzing your CV. Please try again.", "error")
+        flash(f"Analysis failed: {type(e).__name__}: {e}", "error")
         return render_template('form.html', form=form), 500
 
 
