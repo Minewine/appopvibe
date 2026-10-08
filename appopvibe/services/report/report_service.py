@@ -139,25 +139,28 @@ class ReportService:
     def _readable(self, markdown_content: str) -> str:
         """Turn a raw model JSON block into readable markdown."""
         score = re.search(r'"score"\s*:\s*(\d+)', markdown_content)
+        advice = re.search(r'"recommendation"\s*:\s*"([^"]*)"', markdown_content)
         line = re.search(r'"oneline"\s*:\s*"([^"]*)"', markdown_content)
         if score or line:
             summary = ["### Score", ""]
             if score:
                 summary.append(f"**{score.group(1)}/100**")
+            if advice:
+                summary += ["", advice.group(1)]
             if line:
-                summary += ["", line.group(1).replace("\\n", " ")]
+                summary += ["", line.group(1)]
             markdown_content = re.sub(
-                r"(## Analysis Summary\n+)\{.*?(?=\n## |\Z)",
-                lambda m: m.group(1) + "\n".join(summary) + "\n\n",
+                r"## Analysis Summary\s*\{.*",
+                "## Analysis Summary\n\n" + "\n".join(summary) + "\n",
                 markdown_content,
                 count=1,
                 flags=re.S,
             )
-        if '"cvmarkdown"' in markdown_content or '"cv_markdown"' in markdown_content:
+        if "cvmarkdown" in markdown_content.lower():
             cv = cv_text_from_blob(markdown_content)
             markdown_content = re.sub(
-                r"(## (?:Rewritten CV Optimized for ATS|CV réécrit, optimisé ATS)\n+)\{.*",
-                lambda m: m.group(1) + cv + "\n",
+                r"## (?:Rewritten CV Optimized for ATS|CV réécrit, optimisé ATS)\s*\{.*",
+                "## Rewritten CV\n\n" + cv + "\n",
                 markdown_content,
                 count=1,
                 flags=re.S,
