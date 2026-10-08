@@ -3,11 +3,6 @@ import io
 import re
 from typing import List, Tuple
 
-from docx import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
-from docx.shared import Cm, Pt, RGBColor
 
 NAVY = RGBColor(0x1F, 0x3A, 0x5F)
 RULE = "1F3A5F"
@@ -61,15 +56,31 @@ SECTION_MAP = {
 
 def extract_rewritten_cv(report_markdown: str) -> Tuple[str, str]:
     """Return (cv_markdown, language code) from a saved report."""
+    cv, language, _source = extract_cv_for_docx(report_markdown)
+    return cv, language
+
+
+def extract_cv_for_docx(report_markdown: str) -> Tuple[str, str, str]:
+    """Return CV markdown, language, and source (rewritten or original)."""
     language = "fr" if re.search(r"Language:\s*Français", report_markdown) else "en"
-    match = re.search(
+    rewritten = re.search(
         r"## (?:Rewritten CV Optimized for ATS|CV réécrit, optimisé ATS)\n+(.*?)(?:\n## |\Z)",
         report_markdown,
         re.S,
     )
-    cv = match.group(1).strip() if match else ""
-    cv = re.sub(r"\n### (?:Omitted keywords|Mots-clés omis|What changed|Ce qui a changé)\n.*", "", cv, flags=re.S)
-    return cv.strip(), language
+    if rewritten:
+        cv = re.sub(
+            r"\n### (?:Omitted keywords|Mots-clés omis|What changed|Ce qui a changé)\n.*",
+            "",
+            rewritten.group(1),
+            flags=re.S,
+        ).strip()
+        if cv:
+            return cv, language, "rewritten"
+    original = re.search(r"## Original CV\n+```\n(.*?)\n```", report_markdown, re.S)
+    if original and original.group(1).strip():
+        return original.group(1).strip(), language, "original"
+    return "", language, ""
 
 
 def _set_run_font(run, name="Calibri", size=11, bold=False, color=None, italic=False):
@@ -135,6 +146,16 @@ def _parse_sections(cv_markdown: str) -> Tuple[str, List[str], List[Tuple[str, L
 
 
 def build_swiss_cv(cv_markdown: str, language: str = "en") -> bytes:
+    try:
+        from docx import Document
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
+        from docx.shared import Cm, Pt, RGBColor
+    except ImportError as exc:
+        raise RuntimeError(
+            "Word export is not installed in this app. Run the appopvibe pip install python-docx, then restart."
+        ) from exc
     labels = HEADINGS.get(language, HEADINGS["en"])
     name, contact, sections = _parse_sections(cv_markdown)
     doc = Document()
