@@ -149,13 +149,17 @@ class ReportService:
                 summary += ["", advice.group(1)]
             if line:
                 summary += ["", line.group(1)]
-            markdown_content = re.sub(
-                r"## Analysis Summary\s*\{.*",
-                "## Analysis Summary\n\n" + "\n".join(summary) + "\n",
-                markdown_content,
-                count=1,
-                flags=re.S,
-            )
+            start = markdown_content.find("## Analysis Summary")
+            nxt = markdown_content.find("\n## ", start + 5)
+            if start != -1:
+                end = nxt if nxt != -1 else len(markdown_content)
+                markdown_content = (
+                    markdown_content[:start]
+                    + "## Analysis Summary\n\n"
+                    + "\n".join(summary)
+                    + "\n\n"
+                    + markdown_content[end:]
+                )
         if "cvmarkdown" in markdown_content.lower():
             cv = cv_text_from_blob(markdown_content)
             markdown_content = re.sub(

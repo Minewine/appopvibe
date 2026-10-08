@@ -55,8 +55,10 @@ def download_docx(report_id):
         current_app.logger.exception("DOCX build failed")
         payload = _plain_docx(cv_markdown)
     name = "cv_rewritten" if source == "rewritten" else "cv"
+    buffer = BytesIO(payload)
+    buffer.seek(0)
     return send_file(
-        BytesIO(payload),
+        buffer,
         as_attachment=True,
         download_name=f"{name}_{language}_{report_id}.docx",
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
