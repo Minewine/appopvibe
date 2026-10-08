@@ -72,14 +72,14 @@ class LLMService:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-        payload = {
-            "model": model,
-            "messages": messages,
-            "temperature": temperature,
-            "max_completion_tokens": max_tokens,
-        }
-        if json_mode and "gpt-oss" not in model:
-            payload["response_format"] = {"type": "json_object"}
+        payload = {"model": model, "messages": messages}
+        if "gpt-oss" in model:
+            payload["max_completion_tokens"] = max_tokens
+        else:
+            payload["temperature"] = temperature
+            payload["max_tokens"] = max_tokens
+            if json_mode:
+                payload["response_format"] = {"type": "json_object"}
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -95,6 +95,10 @@ class LLMService:
                     if response.status_code == 429 and attempt < 2:
                         self.logger.warning("Rate limited, waiting before retry %s", attempt + 1)
                         await asyncio.sleep(12)
+                        continue
+                    if response.status_code == 400 and attempt == 0:
+                        self.logger.warning("Bad request, retrying with a minimal payload: %s", response.text[:200])
+                        payload = {"model": model, "messages": messages, "max_completion_tokens": min(max_tokens, 800)}
                         continue
                     response.raise_for_status()
                     result = response.json()

@@ -110,7 +110,7 @@ def analyze():
             result.get('cover_letter'),
         )
         session['current_report_id'] = report_id
-        return redirect(url_for('report.view_report', report_id=report_id))
+        return redirect(f"{request.script_root}/report/{report_id}")
 
     except Exception as e:
         logger.exception("Error processing submission: %s", e)
