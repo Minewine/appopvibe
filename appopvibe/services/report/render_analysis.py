@@ -49,14 +49,14 @@ def render_analysis(data: dict, language: str = "en") -> str:
     if any(kw.get(key) for key in ("exact_matches", "synonyms_already_in_cv", "missing_exact_terms", "do_not_add")):
         lines += ["", f"## 3. {t['keywords']}", ""]
         lines.append("- Exact: " + ", ".join(kw.get("exact_matches") or ["—"]))
-    syn = [
-        f"{s.get('cv_term')} → {s.get('jd_term')}"
-        for s in (kw.get("synonyms_already_in_cv") or [])
-        if isinstance(s, dict)
-    ]
-    lines.append("- Already said another way: " + ", ".join(syn or ["—"]))
-    lines.append("- Missing exact terms: " + ", ".join(kw.get("missing_exact_terms") or ["—"]))
-    lines.append("- Do not add: " + ", ".join(kw.get("do_not_add") or ["—"]))
+        syn = [
+            f"{s.get('cv_term')} → {s.get('jd_term')}"
+            for s in (kw.get("synonyms_already_in_cv") or [])
+            if isinstance(s, dict)
+        ]
+        lines.append("- Already said another way: " + ", ".join(syn or ["—"]))
+        lines.append("- Missing exact terms: " + ", ".join(kw.get("missing_exact_terms") or ["—"]))
+        lines.append("- Do not add: " + ", ".join(kw.get("do_not_add") or ["—"]))
     strengths = data.get("strengths") or []
     if strengths:
         lines += ["", f"## 4. {t['strengths']}", ""]

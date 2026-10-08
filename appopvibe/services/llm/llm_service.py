@@ -75,6 +75,7 @@ class LLMService:
         payload = {"model": model, "messages": messages}
         if "gpt-oss" in model:
             payload["max_completion_tokens"] = max_tokens
+            payload["reasoning_effort"] = "low"
         else:
             payload["temperature"] = temperature
             payload["max_tokens"] = max_tokens
@@ -96,14 +97,15 @@ class LLMService:
                         self.logger.warning("Rate limited, waiting before retry %s", attempt + 1)
                         await asyncio.sleep(12)
                         continue
-                    if response.status_code == 400 and attempt == 0:
-                        self.logger.warning("Bad request, retrying with a minimal payload: %s", response.text[:200])
-                        payload = {"model": model, "messages": messages, "max_completion_tokens": min(max_tokens, 800)}
+                    if response.status_code == 400 and "reasoning_effort" in payload and attempt == 0:
+                        self.logger.warning("Retrying without reasoning_effort: %s", response.text[:200])
+                        payload.pop("reasoning_effort", None)
                         continue
                     response.raise_for_status()
                     result = response.json()
                     if "choices" in result and result["choices"]:
-                        return result["choices"][0]["message"]["content"]
+                        message = result["choices"][0].get("message") or {}
+                        return message.get("content") or message.get("reasoning") or ""
                     self.logger.warning("Unexpected API response format")
                     return "Error: Unexpected response from LLM API"
                 return "Error: LLM API request failed with status 429"
