@@ -23,7 +23,7 @@ class CVAnalysisForm(FlaskForm):
         ('fr', 'Français')
     ], default='en')
     rewrite_cv = BooleanField('Rewrite CV optimized for ATS', default=False)
-    cover_letter = BooleanField('Draft a cover letter', default=False)
+    cover_letter = BooleanField('Draft a cover letter', default=True)
 
 
 class FeedbackForm(FlaskForm):

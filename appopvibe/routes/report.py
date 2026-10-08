@@ -22,6 +22,32 @@ def _checked_id(report_id: str) -> str:
     return report_id
 
 
+@report_bp.route("/download-docx/<report_id>")
+def download_docx(report_id):
+    """Download the CV as a Swiss-style Word document."""
+    report_id = _checked_id(report_id)
+    reports_folder = current_app.config.get("REPORTS_FOLDER", "reports")
+    report_service = ReportService(reports_directory=reports_folder)
+    markdown = report_service.get_report(report_id)
+    if not markdown:
+        abort(404)
+    cv_markdown, language, source = extract_cv_for_docx(markdown)
+    if not cv_markdown:
+        abort(404)
+    try:
+        payload = build_swiss_cv(cv_markdown, language)
+    except Exception as exc:
+        current_app.logger.exception("DOCX build failed")
+        abort(500, description=str(exc))
+    name = "cv_rewritten" if source == "rewritten" else "cv_original"
+    return send_file(
+        BytesIO(payload),
+        as_attachment=True,
+        download_name=f"{name}_{language}_{report_id}.docx",
+        mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+
+
 @report_bp.route("/<report_id>")
 def view_report(report_id):
     """Display a CV analysis report."""
@@ -56,30 +82,3 @@ def download_report(report_id):
         )
     except FileNotFoundError:
         abort(404)
-
-
-@report_bp.route("/download-docx/<report_id>")
-def download_docx(report_id):
-    """Download the CV as a Swiss-style Word document."""
-    report_id = _checked_id(report_id)
-    reports_folder = current_app.config.get("REPORTS_FOLDER", "reports")
-    report_service = ReportService(reports_directory=reports_folder)
-    markdown = report_service.get_report(report_id)
-    if not markdown:
-        abort(404)
-    cv_markdown, language, source = extract_cv_for_docx(markdown)
-    if not cv_markdown:
-        flash("No CV text was found in this report.", "error")
-        return redirect(url_for("report.view_report", report_id=report_id))
-    try:
-        payload = build_swiss_cv(cv_markdown, language)
-    except RuntimeError as exc:
-        flash(str(exc), "error")
-        return redirect(url_for("report.view_report", report_id=report_id))
-    name = "cv_rewritten" if source == "rewritten" else "cv_original"
-    return send_file(
-        BytesIO(payload),
-        as_attachment=True,
-        download_name=f"{name}_{language}_{report_id}.docx",
-        mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    )
