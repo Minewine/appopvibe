@@ -82,6 +82,8 @@ def extract_cv_for_docx(report_markdown: str) -> Tuple[str, str, str]:
 
 
 def _set_run_font(run, name="Calibri", size=11, bold=False, color=None, italic=False):
+    from docx.oxml.ns import qn
+    from docx.shared import Pt
     run.font.name = name
     run._element.rPr.rFonts.set(qn("w:eastAsia"), name)
     run.font.size = Pt(size)
@@ -92,6 +94,8 @@ def _set_run_font(run, name="Calibri", size=11, bold=False, color=None, italic=F
 
 
 def _add_bottom_border(paragraph):
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
     p_pr = paragraph._p.get_or_add_pPr()
     p_bdr = OxmlElement("w:pBdr")
     bottom = OxmlElement("w:bottom")
@@ -103,7 +107,8 @@ def _add_bottom_border(paragraph):
     p_pr.append(p_bdr)
 
 
-def _heading(doc, text):
+def _heading(doc, text, navy):
+    from docx.shared import Pt
     p = doc.add_paragraph()
     p.paragraph_format.space_before = Pt(12)
     p.paragraph_format.space_after = Pt(4)
@@ -190,7 +195,7 @@ def build_swiss_cv(cv_markdown: str, language: str = "en") -> bytes:
         items = grouped.get(key)
         if not items:
             continue
-        _heading(doc, labels[key])
+        _heading(doc, labels[key], navy)
         for item in items:
             bullet = item.startswith(("-", "*"))
             text = item.lstrip("-* ").strip()
