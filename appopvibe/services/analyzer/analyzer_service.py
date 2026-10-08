@@ -33,27 +33,59 @@ class AnalyzerService:
         except json.JSONDecodeError:
             return json.loads(blob, strict=False)
 
-    async def analyze_cv_jd(self, cv_text: str, jd_text: str, language: str = "en") -> str:
-        self.logger.info(
-            "Analyzing CV (%s chars) against JD (%s chars) in %s",
-            len(cv_text), len(jd_text), language,
-        )
+    async def _ask(self, prompt: str, system: str, max_tokens: int) -> Dict[str, Any]:
         raw = await self.llm_service.generate(
-            prompt=self.prompt_templates["analysis"].format(cv=cv_text, jd=jd_text),
-            system=self.prompt_templates["system"],
+            prompt=prompt,
+            system=system,
             temperature=0.2,
-            max_tokens=2200,
+            max_tokens=max_tokens,
             json_mode=True,
         )
         if raw.startswith("Error:"):
-            return raw
+            return {"error": raw}
         try:
-            data = self._parse_json(raw)
+            return self._parse_json(raw)
         except (json.JSONDecodeError, ValueError) as exc:
-            self.logger.warning("Analysis JSON failed: %s", exc)
-            return raw
-        rendered = render_analysis(data, language)
-        self.logger.info("Analysis completed, score=%s", data.get("score"))
+            self.logger.warning("JSON failed: %s", exc)
+            return {"error": raw}
+
+    def _score_from_rubric(self, data: Dict[str, Any]) -> None:
+        rows = [row for row in data.get("rubric") or [] if isinstance(row, dict)]
+        weights = [float(row.get("weight") or 0) for row in rows]
+        scores = [float(row.get("score") or 0) for row in rows]
+        total = sum(weights)
+        if total:
+            data["score"] = round(sum(w * s for w, s in zip(weights, scores)) / total)
+
+    async def analyze_cv_jd(self, cv_text: str, jd_text: str, language: str = "en") -> str:
+        self.logger.info("Scoring CV (%s chars) against JD (%s chars)", len(cv_text), len(jd_text))
+        lang = "French" if language == "fr" else "English"
+        score = await self._ask(
+            f"Score this CV against this job description. Respond in {lang}. "
+            "Use only stated facts. Return JSON with score, recommendation "
+            "(strong_match, possible_match, weak_match, do_not_apply_yet), one_line, "
+            "and rubric rows for must_have_skills, domain, seniority, impact, keywords. "
+            "Each row has dimension, weight, score 0-100, evidence, gap. "
+            "Weights must sum to 100. Absent is not stated, not proof of a missing skill.\n\n"
+            f"<cv>\n{cv_text}\n</cv>\n<job_description>\n{jd_text}\n</job_description>",
+            self.prompt_templates["system"],
+            900,
+        )
+        if score.get("error"):
+            return score["error"]
+        self._score_from_rubric(score)
+        details = await self._ask(
+            "Using the same CV and job description, return JSON with must_haves, keywords, "
+            "strengths, risks, edits, interview_prompts, honesty_check. Keep each list to 4 items. "
+            f"Respond in {lang}. Do not invent facts.\n\n"
+            f"<cv>\n{cv_text}\n</cv>\n<job_description>\n{jd_text}\n</job_description>",
+            self.prompt_templates["system"],
+            900,
+        )
+        if not details.get("error"):
+            score.update({k: v for k, v in details.items() if k != "score"})
+        rendered = render_analysis(score, language)
+        self.logger.info("Analysis completed, score=%s", score.get("score"))
         return rendered
 
     async def rewrite_cv(self, cv_text: str, jd_text: str, language: str = "en") -> str:
@@ -62,7 +94,7 @@ class AnalyzerService:
             prompt=self.prompt_templates["rewrite"].format(cv=cv_text, jd=jd_text),
             system=self.prompt_templates["rewrite_system"],
             temperature=0.3,
-            max_tokens=2200,
+            max_tokens=1600,
             json_mode=True,
         )
         if raw.startswith("Error:"):
