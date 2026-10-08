@@ -33,34 +33,6 @@ class AnalyzerService:
         except json.JSONDecodeError:
             return json.loads(blob, strict=False)
 
-
-def _close_json(blob: str) -> str:
-    """Close a reply that was cut off by the token limit."""
-    out = []
-    stack = []
-    in_string = False
-    escape = False
-    for ch in blob:
-        out.append(ch)
-        if in_string:
-            if escape:
-                escape = False
-            elif ch == "\\":
-                escape = True
-            elif ch == '"':
-                in_string = False
-            continue
-        if ch == '"':
-            in_string = True
-        elif ch in "{[":
-            stack.append("}" if ch == "{" else "]")
-        elif ch in "}]" and stack:
-            stack.pop()
-    if in_string:
-        out.append('"')
-    out.append("".join(reversed(stack)))
-    return "".join(out)
-
     async def analyze_cv_jd(self, cv_text: str, jd_text: str, language: str = "en") -> str:
         self.logger.info(
             "Analyzing CV (%s chars) against JD (%s chars) in %s",
@@ -138,3 +110,30 @@ def _close_json(blob: str) -> str:
             await asyncio.sleep(2)
             result["cover_letter"] = await self.draft_letter(cv_text, jd_text, language)
         return result
+
+def _close_json(blob: str) -> str:
+    """Close a reply that was cut off by the token limit."""
+    out = []
+    stack = []
+    in_string = False
+    escape = False
+    for ch in blob:
+        out.append(ch)
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch in "{[":
+            stack.append("}" if ch == "{" else "]")
+        elif ch in "}]" and stack:
+            stack.pop()
+    if in_string:
+        out.append('"')
+    out.append("".join(reversed(stack)))
+    return "".join(out)
