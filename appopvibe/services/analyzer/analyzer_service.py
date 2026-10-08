@@ -51,6 +51,29 @@ class AnalyzerService:
         data["raw"] = raw
         return data
 
+
+    def _salvage_score(self, raw: str) -> Dict[str, Any]:
+        data: Dict[str, Any] = {}
+        score = re.search(r'"score"\s*:\s*(\d+)', raw)
+        advice = re.search(r'"recommendation"\s*:\s*"([^"]*)"', raw)
+        line = re.search(r'"oneline"\s*:\s*"([^"]*)"', raw) or re.search(r'"one_line"\s*:\s*"([^"]*)"', raw)
+        if score:
+            data["score"] = int(score.group(1))
+        if advice:
+            data["recommendation"] = advice.group(1)
+        if line:
+            data["one_line"] = line.group(1)
+        rows = []
+        for dim, weight, row_score, gap in re.findall(
+            r'"dimension"\s*:\s*"([^"]*)".*?"weight"\s*:\s*(\d+).*?"score"\s*:\s*(\d+).*?"gap"\s*:\s*"([^"]*)"',
+            raw,
+            flags=re.S,
+        ):
+            rows.append({"dimension": dim, "weight": int(weight), "score": int(row_score), "gap": gap})
+        if rows:
+            data["rubric"] = rows
+        return data
+
     def _score_from_rubric(self, data: Dict[str, Any]) -> None:
         rows = [row for row in data.get("rubric") or [] if isinstance(row, dict)]
         weights = [float(row.get("weight") or 0) for row in rows]
@@ -73,8 +96,11 @@ class AnalyzerService:
             self.prompt_templates["system"],
             900,
         )
-        if score.get("error") or not (score.get("score") or score.get("rubric") or score.get("one_line") or score.get("oneline")):
-            return score.get("raw") or score.get("error") or "The model did not return a score."
+        if not (score.get("score") or score.get("rubric") or score.get("one_line") or score.get("oneline")):
+            salvaged = self._salvage_score(score.get("raw") or "")
+            if not salvaged.get("score"):
+                return score.get("raw") or score.get("error") or "The model did not return a score."
+            score = salvaged
         if not score.get("one_line"):
             score["one_line"] = score.get("oneline") or score.get("oneLine") or ""
         self._score_from_rubric(score)
