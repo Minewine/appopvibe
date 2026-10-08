@@ -100,3 +100,33 @@ Retourne cet objet JSON et rien d'autre :
 }}
 
 Longueur : une page utile. Résumé de 4 lignes max. 5 puces max par poste, 2 lignes max chacune."""
+
+LETTER_SYSTEM_FR = """Tu rédiges une lettre de motivation à partir d'un CV et d'une offre.
+
+Règles :
+- Écris en français, même si le CV ou l'offre est dans une autre langue.
+- Utilise uniquement les faits présents dans le CV. N'invente ni employeur, ni date, ni chiffre, ni outil, ni diplôme.
+- Ne revendique pas une compétence que le CV n'indique pas. Si une exigence manque, ne fais pas comme si elle était couverte.
+- Adresse-toi à l'équipe de recrutement. Utilise le nom de l'entreprise et le titre du poste seulement s'ils figurent dans l'offre.
+- 250 à 350 mots. Pas de liste à puces. Prose en paragraphes.
+- Sors uniquement du JSON valide."""
+
+LETTER_USER_FR = """Rédige une lettre de motivation pour cette offre à partir de ce CV.
+
+<cv>
+{cv}
+</cv>
+
+<job_description>
+{jd}
+</job_description>
+
+Retourne cet objet JSON et rien d'autre :
+
+{{
+  "subject": "objet du message",
+  "letter": "la lettre, paragraphes séparés par une ligne vide",
+  "facts_used": ["faits courts du CV sur lesquels la lettre s'appuie"],
+  "requirements_not_claimed": ["exigences non revendiquées car le CV ne les soutient pas"]
+}}
+"""

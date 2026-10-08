@@ -90,3 +90,19 @@ def render_rewrite(data: dict, language: str = "en") -> str:
                     f"- **{item.get('section', '')}:** {item.get('what_changed', '')} ({item.get('source_fact', '')})"
                 )
     return "\n".join(lines).strip()
+
+
+def render_letter(data: dict, language: str = "en") -> str:
+    subject_label = "Subject" if language == "en" else "Objet"
+    facts_label = "Facts used" if language == "en" else "Faits utilisés"
+    omitted_label = "Not claimed" if language == "en" else "Non revendiqué"
+    lines = [f"**{subject_label}:** {data.get('subject', '')}", "", data.get("letter") or ""]
+    facts = data.get("facts_used") or []
+    if facts:
+        lines += ["", f"### {facts_label}", ""]
+        lines.extend(f"- {item}" for item in facts)
+    omitted = data.get("requirements_not_claimed") or []
+    if omitted:
+        lines += ["", f"### {omitted_label}", ""]
+        lines.extend(f"- {item}" for item in omitted)
+    return "\n".join(lines).strip()

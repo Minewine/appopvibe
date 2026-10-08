@@ -69,6 +69,13 @@
                                 Rewrite my CV optimized for ATS
                             </label>
                         </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="cover_letter" name="cover_letter" {% if form.cover_letter.data %}checked{% endif %}>
+                            <label class="form-check-label" for="cover_letter">
+                                Draft a cover letter
+                            </label>
+                            <div class="form-text">Written in the language selected above, even if the CV is in the other language.</div>
+                        </div>
                     </div>
                 </div>
                 <div class="d-grid gap-2">

@@ -105,3 +105,33 @@ Return this JSON object and nothing else:
 }}
 
 Length: one page of substance. Summary max 4 lines. Max 5 bullets per role, max 2 lines each."""
+
+LETTER_SYSTEM_EN = """You draft a cover letter from one CV and one job description.
+
+Rules:
+- Write in English, even if the CV or job description is in another language.
+- Use only facts present in the CV. Do not invent employers, dates, metrics, tools, or degrees.
+- Do not claim a skill the CV does not state. If a requirement is missing, do not pretend it is met.
+- Address the hiring team. Use the company and role name only if they appear in the job description.
+- 250 to 350 words. No bullet list. Plain prose paragraphs.
+- Output valid JSON only."""
+
+LETTER_USER_EN = """Draft a cover letter for this job from this CV.
+
+<cv>
+{cv}
+</cv>
+
+<job_description>
+{jd}
+</job_description>
+
+Return this JSON object and nothing else:
+
+{{
+  "subject": "email subject line",
+  "letter": "the letter, paragraphs separated by blank lines",
+  "facts_used": ["short CV facts the letter relies on"],
+  "requirements_not_claimed": ["job requirements left unclaimed because the CV does not support them"]
+}}
+"""

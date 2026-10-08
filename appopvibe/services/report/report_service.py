@@ -29,7 +29,8 @@ class ReportService:
         return self.reports_dir / f"{safe}.md"
 
     def save_report(self, cv_text: str, jd_text: str, analysis_result: str,
-                    rewritten_cv: Optional[str] = None, language: str = "en") -> str:
+                    rewritten_cv: Optional[str] = None, language: str = "en",
+                    cover_letter: Optional[str] = None) -> str:
         report_id = self.generate_report_filename()
         file_path = self._path_for(report_id)
         language_labels = {'en': 'English', 'fr': 'Français'}
@@ -46,10 +47,19 @@ class ReportService:
 
 """
         if rewritten_cv:
+            title = "Rewritten CV Optimized for ATS" if language != "fr" else "CV réécrit, optimisé ATS"
             report_content += f"""
-## Rewritten CV Optimized for ATS
+## {title}
 
 {rewritten_cv}
+
+"""
+        if cover_letter:
+            title = "Draft cover letter" if language != "fr" else "Brouillon de lettre de motivation"
+            report_content += f"""
+## {title}
+
+{cover_letter}
 
 """
         report_content += f"""

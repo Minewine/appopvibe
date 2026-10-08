@@ -23,22 +23,28 @@ MAX_FIELD_CHARS = 12000
 def _prompts_for(language: str) -> dict:
     if language == 'fr':
         from prompts.prompts_fr import (
-            SYSTEM_FR, ANALYSIS_USER_FR, REWRITE_SYSTEM_FR, REWRITE_USER_FR
+            SYSTEM_FR, ANALYSIS_USER_FR, REWRITE_SYSTEM_FR, REWRITE_USER_FR,
+            LETTER_SYSTEM_FR, LETTER_USER_FR,
         )
         return {
             'system': SYSTEM_FR,
             'analysis': ANALYSIS_USER_FR,
             'rewrite_system': REWRITE_SYSTEM_FR,
             'rewrite': REWRITE_USER_FR,
+            'letter_system': LETTER_SYSTEM_FR,
+            'letter': LETTER_USER_FR,
         }
     from prompts.prompts_en import (
-        SYSTEM_EN, ANALYSIS_USER_EN, REWRITE_SYSTEM_EN, REWRITE_USER_EN
+        SYSTEM_EN, ANALYSIS_USER_EN, REWRITE_SYSTEM_EN, REWRITE_USER_EN,
+        LETTER_SYSTEM_EN, LETTER_USER_EN,
     )
     return {
         'system': SYSTEM_EN,
         'analysis': ANALYSIS_USER_EN,
         'rewrite_system': REWRITE_SYSTEM_EN,
         'rewrite': REWRITE_USER_EN,
+        'letter_system': LETTER_SYSTEM_EN,
+        'letter': LETTER_USER_EN,
     }
 
 
@@ -74,9 +80,10 @@ def analyze():
 
     language = form.language.data or 'en'
     rewrite_cv = bool(form.rewrite_cv.data)
+    cover_letter = bool(form.cover_letter.data)
 
     try:
-        logger.info("Processing submission - Language: %s, Rewrite CV: %s", language, rewrite_cv)
+        logger.info("Processing submission - Language: %s, Rewrite CV: %s, Letter: %s", language, rewrite_cv, cover_letter)
         groq_api_key = os.getenv('GROQ_API_KEY')
         if not groq_api_key:
             logger.error("No GROQ_API_KEY found in environment variables")
@@ -88,7 +95,7 @@ def analyze():
 
         analyzer_service = AnalyzerService(llm_service, _prompts_for(language))
         result = asyncio.run(
-            analyzer_service.process_submission(cv_text, jd_text, language, rewrite_cv)
+            analyzer_service.process_submission(cv_text, jd_text, language, rewrite_cv, cover_letter)
         )
 
         reports_dir = current_app.config.get('REPORTS_FOLDER', os.path.join(os.getcwd(), 'reports'))
@@ -100,6 +107,7 @@ def analyze():
             result.get('analysis', ''),
             result.get('rewritten_cv'),
             language,
+            result.get('cover_letter'),
         )
         session['current_report_id'] = report_id
         return redirect(url_for('report.view_report', report_id=report_id))

@@ -7,7 +7,7 @@ import re
 from typing import Any, Dict
 
 from appopvibe.services.llm.llm_service import LLMService
-from appopvibe.services.report.render_analysis import render_analysis, render_rewrite
+from appopvibe.services.report.render_analysis import render_analysis, render_rewrite, render_letter
 
 
 class AnalyzerService:
@@ -64,20 +64,35 @@ class AnalyzerService:
         self.logger.info("CV rewriting completed, result length: %s", len(rendered))
         return rendered
 
+    async def draft_letter(self, cv_text: str, jd_text: str, language: str = "en") -> str:
+        self.logger.info("Drafting cover letter in %s", language)
+        raw = await self.llm_service.generate(
+            prompt=self.prompt_templates["letter"].format(cv=cv_text, jd=jd_text),
+            system=self.prompt_templates["letter_system"],
+            temperature=0.4,
+            max_tokens=1800,
+            json_mode=True,
+        )
+        if raw.startswith("Error:"):
+            return raw
+        data = self._parse_json(raw)
+        rendered = render_letter(data, language)
+        self.logger.info("Cover letter completed, result length: %s", len(rendered))
+        return rendered
+
     async def process_submission(
-        self, cv_text: str, jd_text: str, language: str = "en", rewrite: bool = False
+        self, cv_text: str, jd_text: str, language: str = "en",
+        rewrite: bool = False, cover_letter: bool = False,
     ) -> Dict[str, str]:
-        self.logger.info("Processing submission (rewrite=%s)", rewrite)
+        self.logger.info("Processing submission (rewrite=%s, letter=%s)", rewrite, cover_letter)
+        import asyncio
+        tasks = [self.analyze_cv_jd(cv_text, jd_text, language)]
+        keys = ["analysis"]
         if rewrite:
-            analysis, rewritten = await _gather(
-                self.analyze_cv_jd(cv_text, jd_text, language),
-                self.rewrite_cv(cv_text, jd_text, language),
-            )
-            return {"analysis": analysis, "rewritten_cv": rewritten}
-        analysis = await self.analyze_cv_jd(cv_text, jd_text, language)
-        return {"analysis": analysis}
-
-
-async def _gather(left, right):
-    import asyncio
-    return await asyncio.gather(left, right)
+            tasks.append(self.rewrite_cv(cv_text, jd_text, language))
+            keys.append("rewritten_cv")
+        if cover_letter:
+            tasks.append(self.draft_letter(cv_text, jd_text, language))
+            keys.append("cover_letter")
+        results = await asyncio.gather(*tasks)
+        return dict(zip(keys, results))
