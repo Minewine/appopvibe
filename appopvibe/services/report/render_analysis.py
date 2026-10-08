@@ -56,31 +56,45 @@ def render_analysis(data: dict, language: str = "en") -> str:
         kw = {"exact_matches": [str(item) for item in kw]}
     if isinstance(kw, dict) and any(kw.get(key) for key in ("exact_matches", "synonyms_already_in_cv", "missing_exact_terms", "do_not_add")):
         lines += ["", f"## 3. {t['keywords']}", ""]
-        lines.append("- Exact: " + ", ".join(kw.get("exact_matches") or ["—"]))
+        exact = kw.get("exact_matches") or ["—"]
+        if isinstance(exact, str):
+            exact = [exact]
+        lines.append("- Exact: " + ", ".join(str(item) for item in exact))
         syn = [
             f"{s.get('cv_term')} → {s.get('jd_term')}"
             for s in (kw.get("synonyms_already_in_cv") or [])
             if isinstance(s, dict)
         ]
         lines.append("- Already said another way: " + ", ".join(syn or ["—"]))
-        lines.append("- Missing exact terms: " + ", ".join(kw.get("missing_exact_terms") or ["—"]))
-        lines.append("- Do not add: " + ", ".join(kw.get("do_not_add") or ["—"]))
+        missing = kw.get("missing_exact_terms") or ["—"]
+        banned = kw.get("do_not_add") or ["—"]
+        lines.append("- Missing exact terms: " + ", ".join(str(item) for item in (missing if isinstance(missing, list) else [missing])))
+        lines.append("- Do not add: " + ", ".join(str(item) for item in (banned if isinstance(banned, list) else [banned])))
     strengths = data.get("strengths") or []
     if strengths:
         lines += ["", f"## 4. {t['strengths']}", ""]
         for item in strengths:
-            lines.append(f"- {item.get('point', '')} ({item.get('evidence', '')})")
+            if isinstance(item, dict):
+                lines.append(f"- {item.get('point', '')} ({item.get('evidence', '')})")
+            else:
+                lines.append(f"- {item}")
     risks = data.get("risks") or []
     if risks:
         lines += ["", f"## 5. {t['risks']}", ""]
         for item in risks:
-            lines.append(f"- {item.get('point', '')} — {item.get('how_to_handle', '')}")
+            if isinstance(item, dict):
+                lines.append(f"- {item.get('point', '')} — {item.get('how_to_handle', '')}")
+            else:
+                lines.append(f"- {item}")
     edits = data.get("edits") or []
     if edits:
         lines += ["", f"## 6. {t['edits']}", ""]
         for item in edits:
-            lines.append(f"- **{item.get('section', '')}:** {item.get('rewrite', '')}")
-            lines.append(f"  - Why: {item.get('why', '')}")
+            if isinstance(item, dict):
+                lines.append(f"- **{item.get('section', '')}:** {item.get('rewrite', '')}")
+                lines.append(f"  - Why: {item.get('why', '')}")
+            else:
+                lines.append(f"- {item}")
     questions = data.get("interview_prompts") or []
     if questions:
         lines += ["", f"## 7. {t['interview']}", ""]

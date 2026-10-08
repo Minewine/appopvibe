@@ -116,7 +116,11 @@ class AnalyzerService:
         )
         if not details.get("error"):
             score.update({k: v for k, v in details.items() if k != "score"})
-        rendered = render_analysis(score, language)
+        try:
+            rendered = render_analysis(score, language)
+        except Exception as exc:
+            self.logger.exception("Render failed: %s", exc)
+            return score.get("raw") or str(score)
         self.logger.info("Analysis completed, score=%s", score.get("score"))
         return rendered
 
