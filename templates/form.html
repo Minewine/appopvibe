@@ -64,17 +64,18 @@
                     </div>
                     <div class="col-md-6">
                         <div class="form-check mt-4">
-                            <input class="form-check-input" type="checkbox" id="rewrite_cv" name="rewrite_cv" {% if form.rewrite_cv.data %}checked{% endif %}>
+                            <input class="form-check-input" type="checkbox" id="rewrite_cv" name="rewrite_cv" checked>
                             <label class="form-check-label" for="rewrite_cv">
                                 Rewrite my CV optimized for ATS
                             </label>
+                            <div class="form-text">Adds the CV to the same report. Download it as a Word file from that page.</div>
                         </div>
                         <div class="form-check mt-2">
                             <input class="form-check-input" type="checkbox" id="cover_letter" name="cover_letter" checked>
                             <label class="form-check-label" for="cover_letter">
                                 Draft a cover letter
                             </label>
-                            <div class="form-text">Written in the language selected above, even if the CV is in the other language.</div>
+                            <div class="form-text">Added to the same report, in the language selected above. One click does the score and every box that is ticked.</div>
                         </div>
                     </div>
                 </div>
@@ -88,7 +89,7 @@
                             role="status"
                             aria-hidden="true"
                             x-show="loading"></span>
-                        <span x-text="loading ? ' Analyzing...' : 'Analyze'"></span>
+                        <span x-text="loading ? ' Working. This can take a minute...' : 'Analyze'"></span>
                     </button>
                 </div>
             </form>
