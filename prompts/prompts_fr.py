@@ -1,82 +1,102 @@
-"""
-French prompts for CV Analyzer
-"""
+"""French prompts for CV Analyzer. Same contract as prompts_en.py."""
 
-FULL_ANALYSIS_PROMPT_TEMPLATE_FR = """
-Vous êtes un recruteur technique senior. Analysez le CV suivant par rapport à la description de poste fournie.
+SYSTEM_FR = """Tu es responsable du recrutement et spécialiste ATS. Tu compares un seul CV à une seule offre.
 
-CV :
-```
+Règles :
+- Utilise uniquement les faits présents dans le CV ou l'offre. S'il manque un fait, écris "non indiqué". N'invente jamais d'années, d'outils, d'employeurs, de diplômes ou de chiffres.
+- N'invente pas de réalisations pour améliorer la correspondance.
+- Cite une preuve courte (20 mots max) du CV ou de l'offre pour chaque affirmation.
+- Une absence de mot-clé est un écart de formulation, pas la preuve que la compétence manque, sauf contradiction claire dans le CV.
+- Ignore salaire, données démographiques, âge, photo, nationalité et santé.
+- Réponds en français.
+- Sors uniquement du JSON valide. Pas de bloc markdown, pas de préambule."""
+
+ANALYSIS_USER_FR = """Compare ce CV à cette offre.
+
+<cv>
 {cv}
-```
+</cv>
 
-Description du poste :
-```
+<job_description>
 {jd}
-```
+</job_description>
 
-**Instructions :**
-Fournissez votre analyse en Markdown clair en utilisant la structure et les titres de section suivants. Soyez direct, concis et fournissez des conseils exploitables.
+Retourne cet objet JSON et rien d'autre :
 
----
+{{
+  "score": 0,
+  "recommendation": "strong_match | possible_match | weak_match | do_not_apply_yet",
+  "one_line": "Une phrase qu'un recruteur dirait à voix haute.",
+  "rubric": [
+    {{
+      "dimension": "must_have_skills | domain | seniority | impact | keywords | education_or_clearance | logistics",
+      "weight": 0,
+      "score": 0,
+      "evidence": "courte citation ou non indiqué",
+      "gap": "ce qui manque, ou aucun"
+    }}
+  ],
+  "must_haves": [
+    {{"requirement": "", "status": "met | partial | missing", "evidence": ""}}
+  ],
+  "keywords": {{
+    "exact_matches": [],
+    "synonyms_already_in_cv": [{{"jd_term": "", "cv_term": ""}}],
+    "missing_exact_terms": [],
+    "do_not_add": ["termes faux s'ils étaient insérés"]
+  }},
+  "strengths": [{{"point": "", "evidence": ""}}],
+  "risks": [{{"point": "", "evidence": "", "how_to_handle": ""}}],
+  "edits": [
+    {{
+      "section": "summary | experience | skills | education | other",
+      "problem": "",
+      "rewrite": "phrase de remplacement utilisant uniquement des faits existants",
+      "why": ""
+    }}
+  ],
+  "interview_prompts": ["3 questions qu'un recruteur poserait à partir des écarts"],
+  "honesty_check": "ce que le CV survend par rapport au poste, ou aucun"
+}}
 
-## 1. Score de Correspondance Global
-- Donnez un score en pourcentage (0–100 %) indiquant dans quelle mesure le CV correspond aux exigences du poste, avec une justification brève (2–3 phrases).
+Notation :
+- Poids : must_have_skills 35, domain 20, seniority 15, impact 15, keywords 10, logistics 5. Retire une dimension si l'offre ne la mentionne pas, puis renormalise sur 100.
+- score est le total pondéré, entier 0-100.
+- 80+ strong_match, 60-79 possible_match, 40-59 weak_match, moins de 40 do_not_apply_yet.
+- Plafonne le score à 70 si deux must-haves ou plus manquent.
+- Les mots-clés départagent, ils ne font pas le match. Un CV qui montre le travail avec d'autres mots ne doit pas être pénalisé comme si la compétence était absente.
+- edits doit être collable tel quel et ne doit ajouter ni employeur, ni date, ni chiffre, ni outil absent du CV.
+- Garde au plus 6 éléments à fort signal par liste."""
 
-## 2. Analyse des Mots-clés
-- **Mots-clés Correspondants :** Listez les compétences, technologies ou qualifications de la description de poste présentes dans le CV.
-- **Mots-clés Manquants :** Listez les mots-clés ou exigences importants de la description de poste absents du CV.
+REWRITE_SYSTEM_FR = """Tu réécris des CV pour un poste précis. Tu n'as pas le droit d'améliorer le candidat par invention.
 
-## 3. Analyse des Écarts de Compétences
-- Identifiez les compétences, expériences ou qualifications requises par le poste mais absentes ou faibles dans le CV.
+Règles :
+- Conserve chaque employeur, titre, date, lieu et chiffre présent dans le CV. N'en ajoute aucun.
+- Tu peux réordonner, couper les puces hors sujet, et reprendre le vocabulaire de l'offre seulement si le CV soutient déjà ce vocabulaire.
+- Si un mot-clé de l'offre n'a aucun appui dans le CV, laisse-le de côté. Liste-le dans omitted_keywords.
+- Puces : action, ce qui a été fait, résultat. Si le CV n'a pas de résultat, n'en invente pas.
+- Markdown simple. Pas de tableaux, icônes, colonnes ou graphiques.
+- Réponds en français.
+- Sors uniquement du JSON valide."""
 
-## 4. Suggestions par Section
-- **Résumé/Profil :** Suggérez des améliorations pour la section résumé/profil.
-- **Expérience :** Recommandez des reformulations ou ajouts pour mieux correspondre au poste.
-- **Compétences :** Conseillez sur les ajouts ou modifications à la section compétences.
-- **Formation/Autre :** Suggérez toute amélioration pertinente pour la formation ou d'autres sections.
+REWRITE_USER_FR = """Réécris ce CV pour cette offre.
 
-## 5. Points Forts
-- Résumez les principaux atouts du candidat pour ce poste.
-
-## 6. Points Faibles et Axes d'Amélioration
-- Résumez les principales faiblesses ou axes d'amélioration, au-delà des mots-clés manquants.
-
----
-
-**Formatage :**
-- Utilisez des listes à puces si nécessaire.
-- Gardez chaque section concise et orientée action.
-"""
-
-CV_REWRITE_PROMPT_TEMPLATE_FR = """
-Vous êtes un recruteur technique senior et expert en optimisation de CV. Réécrivez le CV suivant pour maximiser sa correspondance avec la description de poste et améliorer ses chances de passer les systèmes de suivi des candidatures (ATS).
-
-CV :
-```
+<cv>
 {cv}
-```
+</cv>
 
-Description du poste :
-```
+<job_description>
 {jd}
-```
+</job_description>
 
-**Instructions :**
-Réécrivez le CV en Markdown professionnel en suivant ces consignes :
+Retourne cet objet JSON et rien d'autre :
 
-1. Intégrez les mots-clés et compétences pertinents de la description de poste dans tout le CV.
-2. Mettez en avant les compétences transférables et les expériences directement pertinentes.
-3. Utilisez des réalisations quantifiables et des exemples précis si possible.
-4. Organisez le CV avec des titres de section clairs : Résumé/Profil, Expérience, Compétences, Formation, Autre (si applicable).
-5. Préservez toutes les informations importantes du CV original, mais reformulez et réorganisez pour plus de clarté et d'impact.
-6. Assurez-vous que le CV est honnête, concis et adapté à la description de poste.
-7. Formatez le CV pour la compatibilité ATS (évitez les tableaux, images ou formatages inhabituels).
+{{
+  "target_title": "l'intitulé du poste, ou le titre honnête le plus proche déjà soutenu par le CV",
+  "cv_markdown": "CV complet en markdown, sections dans cet ordre si présentes : Résumé, Expérience, Projets, Compétences, Formation, Autre",
+  "changes": [{{"section": "", "what_changed": "", "source_fact": ""}}],
+  "omitted_keywords": ["termes de l'offre omis car le CV ne les soutient pas"],
+  "ats_terms_now_present": ["termes exacts de l'offre déjà soutenus et maintenant visibles"]
+}}
 
----
-
-**Format de sortie :**
-- Utilisez le Markdown avec des titres de section clairs.
-- Utilisez des listes à puces pour les réalisations et compétences.
-- Gardez un ton direct et professionnel.
-"""
+Longueur : une page utile. Résumé de 4 lignes max. 5 puces max par poste, 2 lignes max chacune."""

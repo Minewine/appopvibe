@@ -30,15 +30,13 @@ ENV/
 env.bak/
 venv.bak/
 
-# Config - Consider if config.py contains secrets
-# config.py
-
 # IDE / Editor
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Reports - Optional, depends if you want to track them
-# reports/
-.env
+# Generated analyses contain personal CV text. Never commit them.
+reports/*.md
+feedback/
+logs/
