@@ -48,6 +48,8 @@ class AnalyzerService:
         except (json.JSONDecodeError, ValueError) as exc:
             self.logger.warning("JSON failed: %s", exc)
             return {"error": raw, "raw": raw}
+        if not isinstance(data, dict):
+            return {"error": raw, "raw": raw}
         data["raw"] = raw
         return data
 
