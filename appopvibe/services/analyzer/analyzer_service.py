@@ -20,14 +20,18 @@ class AnalyzerService:
 
     def _parse_json(self, raw: str) -> Dict[str, Any]:
         text = (raw or "").strip()
-        if text.startswith("```"):
-            text = re.sub(r"^```(?:json)?\s*", "", text)
-            text = re.sub(r"\s*```$", "", text)
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
         start = text.find("{")
         end = text.rfind("}")
         if start == -1 or end == -1:
             raise ValueError("Model did not return JSON")
-        return json.loads(text[start:end + 1])
+        blob = text[start:end + 1]
+        blob = re.sub(r",\s*([}\]])", r"\1", blob)
+        try:
+            return json.loads(blob)
+        except json.JSONDecodeError:
+            return json.loads(blob, strict=False)
 
     async def analyze_cv_jd(self, cv_text: str, jd_text: str, language: str = "en") -> str:
         self.logger.info(
@@ -43,7 +47,11 @@ class AnalyzerService:
         )
         if raw.startswith("Error:"):
             return raw
-        data = self._parse_json(raw)
+        try:
+            data = self._parse_json(raw)
+        except (json.JSONDecodeError, ValueError) as exc:
+            self.logger.warning("Analysis JSON failed: %s", exc)
+            return raw
         rendered = render_analysis(data, language)
         self.logger.info("Analysis completed, score=%s", data.get("score"))
         return rendered
@@ -59,7 +67,11 @@ class AnalyzerService:
         )
         if raw.startswith("Error:"):
             return raw
-        data = self._parse_json(raw)
+        try:
+            data = self._parse_json(raw)
+        except (json.JSONDecodeError, ValueError) as exc:
+            self.logger.warning("Rewrite JSON failed: %s", exc)
+            return raw
         rendered = render_rewrite(data, language)
         self.logger.info("CV rewriting completed, result length: %s", len(rendered))
         return rendered
@@ -75,7 +87,11 @@ class AnalyzerService:
         )
         if raw.startswith("Error:"):
             return raw
-        data = self._parse_json(raw)
+        try:
+            data = self._parse_json(raw)
+        except (json.JSONDecodeError, ValueError) as exc:
+            self.logger.warning("Letter JSON failed: %s", exc)
+            return raw
         rendered = render_letter(data, language)
         self.logger.info("Cover letter completed, result length: %s", len(rendered))
         return rendered
