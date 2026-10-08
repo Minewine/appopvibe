@@ -38,15 +38,23 @@ def render_analysis(data: dict, language: str = "en") -> str:
         "|---|---:|---:|---|",
     ]
     for row in data.get("rubric") or []:
+        if not isinstance(row, dict):
+            lines.append(f"| {row} |  |  |  |")
+            continue
         lines.append(
             f"| {row.get('dimension', '')} | {row.get('weight', '')} | {row.get('score', '')} | {row.get('gap', '')} |"
         )
     lines += ["", f"## 2. {t['must']}", ""]
     for item in data.get("must_haves") or []:
+        if not isinstance(item, dict):
+            lines.append(f"- {item}")
+            continue
         status = t["status"].get(item.get("status"), item.get("status", ""))
         lines.append(f"- **{status}:** {item.get('requirement', '')} — {item.get('evidence', '')}")
     kw = data.get("keywords") or {}
-    if any(kw.get(key) for key in ("exact_matches", "synonyms_already_in_cv", "missing_exact_terms", "do_not_add")):
+    if isinstance(kw, list):
+        kw = {"exact_matches": [str(item) for item in kw]}
+    if isinstance(kw, dict) and any(kw.get(key) for key in ("exact_matches", "synonyms_already_in_cv", "missing_exact_terms", "do_not_add")):
         lines += ["", f"## 3. {t['keywords']}", ""]
         lines.append("- Exact: " + ", ".join(kw.get("exact_matches") or ["—"]))
         syn = [
