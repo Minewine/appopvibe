@@ -23,15 +23,43 @@ class AnalyzerService:
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
         start = text.find("{")
-        end = text.rfind("}")
-        if start == -1 or end == -1:
+        if start == -1:
             raise ValueError("Model did not return JSON")
-        blob = text[start:end + 1]
+        blob = text[start:]
         blob = re.sub(r",\s*([}\]])", r"\1", blob)
+        blob = _close_json(blob)
         try:
             return json.loads(blob)
         except json.JSONDecodeError:
             return json.loads(blob, strict=False)
+
+
+def _close_json(blob: str) -> str:
+    """Close a reply that was cut off by the token limit."""
+    out = []
+    stack = []
+    in_string = False
+    escape = False
+    for ch in blob:
+        out.append(ch)
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch in "{[":
+            stack.append("}" if ch == "{" else "]")
+        elif ch in "}]" and stack:
+            stack.pop()
+    if in_string:
+        out.append('"')
+    out.append("".join(reversed(stack)))
+    return "".join(out)
 
     async def analyze_cv_jd(self, cv_text: str, jd_text: str, language: str = "en") -> str:
         self.logger.info(
